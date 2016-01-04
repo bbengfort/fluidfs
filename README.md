@@ -1,7 +1,7 @@
 # FlowFS
 
-[![Stories in Ready][waffle_img]][waffle_href]
 [![Build Status][travis_img]][travis_href]
+[![Stories in Ready][waffle_img]][waffle_href]
 
 **A highly consistent distributed filesystem built with FUSE**
 

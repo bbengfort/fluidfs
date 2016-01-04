@@ -1,16 +1,15 @@
 langauge: go
-
+sudo: false
 go:
     - 1.5
 
 install:
-  - go get -v github.com/onsi/ginkgo/ginkgo
-  - go get -v github.com/onsi/gomega
-  - go get gopkg.in/yaml.v2
-  - go get github.com/mitchellh/go-homedir
-  - go get github.com/syndtr/goleveldb/leveldb
-  - go get -v -d ./...
-  - export PATH=$PATH:$HOME/gopath/bin
+    # Add Godeps dependencies to GOPATH and PATH
+    - export GOPATH="${TRAVIS_BUILD_DIR}/Godeps/_workspace:$GOPATH"
+    - export PATH="${TRAVIS_BUILD_DIR}/Godeps/_workspace/bin:$PATH"
+
+before_script:
+    - go get -v -d ./...
 
 script: make test
 
