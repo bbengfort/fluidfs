@@ -9,8 +9,14 @@ install:
     - export PATH="${TRAVIS_BUILD_DIR}/Godeps/_workspace/bin:$PATH"
 
 before_script:
-    # Collect the dependencies from the flow project
+    # Install the testing specific dependencies
+    - go get -v github.com/onsi/ginkgo/ginkgo
+    - go get -v github.com/onsi/gomega
+
+    # Collect the build dependencies from the flow project
     - make deps
+
+
 
 script: make test
 

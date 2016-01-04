@@ -1,6 +1,7 @@
 # FlowFS
 
 [![Build Status][travis_img]][travis_href]
+[![Documentation Status][rtdocs_img]][rtdocs_href]
 [![Stories in Ready][waffle_img]][waffle_href]
 
 **A highly consistent distributed filesystem built with FUSE**
@@ -28,6 +29,8 @@ The image used in this README, ["Not with the flow"][planes] by [David Blackwell
 [travis_href]: https://travis-ci.com/bbengfort/flow
 [waffle_img]: https://badge.waffle.io/bbengfort/flow.png?label=ready&title=Ready
 [waffle_href]: https://waffle.io/bbengfort/flow
+[rtdocs_img]: https://readthedocs.org/projects/flowfs/badge/?version=latest
+[rtdocs_href]: http://flowfs.readthedocs.org/en/latest/?badge=latest
 [planes.jpg]: docs/img/planes.jpg
 [planes]: https://flic.kr/p/gHrT81
 [cli]: https://github.com/codegangsta/cli
