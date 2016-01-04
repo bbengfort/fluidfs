@@ -3,10 +3,6 @@ langauge: go
 go:
     - 1.5
 
-before_install:
-  - sudo apt-get update -qq
-  - sudo apt-get install -qq libmagic-dev
-
 install:
   - go get -v github.com/onsi/ginkgo/ginkgo
   - go get -v github.com/onsi/gomega
