@@ -3,11 +3,7 @@ sudo: false
 go:
     - 1.5
 
-go_import_path: github.com/bbengfort/flow
-
-before_install:
-    - cp .netrc ~
-    - chmod 600 .netrc
+go_import_path: github.com/bbengfort/flow/flow/
 
 install:
     # Add Godeps dependencies to GOPATH and PATH
@@ -20,9 +16,6 @@ before_script:
     # Install the testing specific dependencies
     - go get -v github.com/onsi/ginkgo/ginkgo
     - go get -v github.com/onsi/gomega
-
-    # Collect the build dependencies from the flow project
-    - go get -v -t ./...
 
 script: make citest
 
