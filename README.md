@@ -15,7 +15,9 @@ The following links will work when the project is made open source:
 
 The primary interface is a command line program that interacts directly with the flow library. Note that `main.go` uses the [CLI][cli] library rather than implementing console commands itself. Building from source is implemented using the included Makefile, which fetches dependencies and builds locally rather than to the `$GOPATH`.
 
-There is an RSpec-style test suite that uses [Ginkgo][ginkgo] and [Gomega](gomega). These tests can be run with the Makefile by running `make test`.
+There is an RSpec-style test suite that uses [Ginkgo][ginkgo] and [Gomega](gomega). These tests can be run with the Makefile:
+
+    $ make test
 
 ### Agile Board and Documentation
 
