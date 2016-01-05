@@ -17,5 +17,12 @@ fmt:
 test: deps
 	ginkgo -r -v
 
+citest: deps
+	ginkgo -r -v --randomizeAllSpecs --randomizeSuites --failOnPending --cover --trace --race --compilers=2
+
+clean:
+	@echo "Cleaning up the project source."
+	go clean
+
 .PHONY:
-	all deps fmt test 
+	all deps fmt test citest
