@@ -7,7 +7,7 @@ import (
     "testing"
 )
 
-func TestCrate(t *testing.T) {
+func TestFlow(t *testing.T) {
     RegisterFailHandler(Fail)
     RunSpecs(t, "Flow Suite")
 }

@@ -5,6 +5,10 @@ go:
 
 go_import_path: github.com/bbengfort/flow
 
+before_install:
+    - cp .netrc ~
+    - chmod 600 .netrc
+
 install:
     # Add Godeps dependencies to GOPATH and PATH
     - export GOPATH="${TRAVIS_BUILD_DIR}:$GOPATH"
