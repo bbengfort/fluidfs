@@ -18,7 +18,7 @@ before_script:
     - go get -v github.com/onsi/gomega
 
     # Collect the build dependencies from the flow project
-    - got get -v -t ./...
+    - go get -v -t ./...
 
 script: make citest
 
