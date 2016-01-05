@@ -17,7 +17,7 @@ before_script:
 
     # Symlink the import path
     # http://stackoverflow.com/questions/22560778/go-absolute-imports-and-travis-ci
-    - ln -s $GOPATH/src/github.com/NeilGarb/budget $TRAVIS_BUILD_DIR
+    - ln -s $GOPATH/src/github.com/bbengfort/flow $TRAVIS_BUILD_DIR
 
 script: make citest
 
