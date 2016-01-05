@@ -1,8 +1,10 @@
-# FlowFS
+# FlowFS [![Build Status][travis_img]][travis_href]
 
-[![Build Status][travis_img]][travis_href]
+<!--
+The following links will work when the project is made open source:
 [![Documentation Status][rtdocs_img]][rtdocs_href]
 [![Stories in Ready][waffle_img]][waffle_href]
+-->
 
 **A highly consistent distributed filesystem built with FUSE**
 
@@ -14,6 +16,20 @@
 The primary interface is a command line program that interacts directly with the flow library. Note that `main.go` uses the [CLI][cli] library rather than implementing console commands itself. Building from source is implemented using the included Makefile, which fetches dependencies and builds locally rather than to the `$GOPATH`.
 
 There is an RSpec-style test suite that uses [Ginkgo][ginkgo] and [Gomega](gomega). These tests can be run with the Makefile by running `make test`.
+
+### Agile Board and Documentation
+
+The development board can be found on Waffle:
+
+- [https://waffle.io/bbengfort/flow][waffle_href]
+
+The documentation can be built and served locally with [mkdocs](http://www.mkdocs.org/):
+
+    $ mkdocs serve
+
+And will eventually be hosted on ReadTheDocs.org (the domain has been reserved):
+
+- [http://flowfs.readthedocs.org/en/latest/][rtdocs_href]
 
 ## About
 
