@@ -26,3 +26,9 @@ _testmain.go
 
 # OS X Stuff
 .DS_Store
+
+# Coverage
+*.coverprofile
+
+# Configuration
+.env

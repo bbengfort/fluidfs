@@ -2,13 +2,13 @@
 SHELL := /bin/bash
 
 all: fmt deps
-	@echo "Building FlowFS"
+	@echo "Building FluidFS"
 	@mkdir -p _bin/
-	@go build -v -o _build/flow .
+	@go build -v -o _build/fluid .
 
 deps:
 	@echo "Fetching dependencies"
-	@go get -d -v ./flow/...
+	@go get -d -v ./fluid/...
 
 fmt:
 	@echo "Formatting the source"
@@ -22,7 +22,8 @@ citest: deps
 
 clean:
 	@echo "Cleaning up the project source."
-	go clean
+	@go clean
+	@
 
 .PHONY:
 	all deps fmt test citest
