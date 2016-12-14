@@ -1,7 +1,7 @@
 package version_test
 
 import (
-	. "github.com/bbengfort/flow/flow/version"
+	. "github.com/bbengfort/fluidfs/fluid/version"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"

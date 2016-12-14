@@ -1,19 +1,18 @@
-// Command line interface to FlowFS
+// Command line interface to FluidFS
 
 package main
 
 import (
     "os"
 
-    // "github.com/bbengfort/flow/flow"
-    "github.com/bbengfort/flow/flow/version"
+    "github.com/bbengfort/fluidfs/fluid/version"
     "github.com/codegangsta/cli"
 )
 
 func main() {
 
     app := cli.NewApp()
-    app.Name  = "flow"
+    app.Name  = "fluid"
     app.Usage = "A highly consistent distributed filesystem built with FUSE."
     app.Version = version.Version()
     app.Author = "Benjamin Bengfort"

@@ -1,4 +1,4 @@
-# FlowFS [![Build Status][travis_img]][travis_href]
+# FluidFS [![Build Status][travis_img]][travis_href]
 
 <!--
 The following links will work when the project is made open source:

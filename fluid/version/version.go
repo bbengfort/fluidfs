@@ -1,4 +1,4 @@
-// Handles the version of FlowFS
+// Handles the version of FluidFS
 
 package version
 
