@@ -10,7 +10,7 @@
 
 ## Development
 
-The primary interface is a command line program that interacts directly with the fluid library. Note that `main.go` uses the [CLI][cli] library rather than implementing console commands itself. Building from source is implemented using the included Makefile, which fetches dependencies and builds locally rather than to the `$GOPATH`.
+The primary interface is a command line program that interacts directly with the fluid library. Note that `cmd/fluid/main.go` uses the [CLI](https://github.com/urfave/cli) library rather than implementing console commands itself. Building from source is implemented using the included Makefile, which fetches dependencies and builds locally rather than to the `$GOPATH`.
 
 There is an RSpec-style test suite that uses [Ginkgo][ginkgo] and [Gomega](gomega). These tests can be run with the Makefile:
 
@@ -46,6 +46,5 @@ The image used in this README, ["Atlanta - Georgia Aquarium"][aquarium] by [Milo
 [waffle_href]: https://waffle.io/bbengfort/fluidfs
 [aquarium.jpg]: docs/img/aquarium.jpg
 [aquarium]: https://flic.kr/p/aTUYyR
-[cli]: https://github.com/codegangsta/cli
 [ginkgo]: https://github.com/onsi/ginkgo
 [gomega]: https://github.com/onsi/gomgea

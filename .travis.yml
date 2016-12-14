@@ -6,9 +6,15 @@ go:
 
 before_install:
     - cp .netrc ~
-    - go get github.com/tools/godep
 
 install:
+    # Add Godeps dependencies to GOPATH and PATH
+    - export GOPATH="${TRAVIS_BUILD_DIR}:$GOPATH"
+    - export GOPATH="${TRAVIS_BUILD_DIR}/Godeps/_workspace:$GOPATH"
+    - export PATH="${TRAVIS_BUILD_DIR}/Godeps/_workspace/bin:$PATH"
+    - export PATH=$PATH:$HOME/gopath/bin
+    - go get github.com/tools/godep
+
     # Install the testing specific dependencies
     - go get -v github.com/onsi/ginkgo/ginkgo
     - go get -v github.com/onsi/gomega
@@ -18,6 +24,9 @@ install:
     - godep restore
 
 script: make citest
+
+# after_script:
+#     - goveralls -coverprofile=fluid.coverprofile -service=travis-ci -repotoken $COVERALLS_TOKEN
 
 notifications:
     email:
