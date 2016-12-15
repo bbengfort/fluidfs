@@ -1,5 +1,5 @@
 langauge: go
-sudo: false
+
 go:
     - 1.6
     - 1.7
@@ -7,7 +7,7 @@ go:
 before_install:
     - cp .netrc ~
 
-before_script:
+install:
     # Add Godeps dependencies to GOPATH and PATH
 #    - export GOPATH="${TRAVIS_BUILD_DIR}:$GOPATH"
 #    - export GOPATH="${TRAVIS_BUILD_DIR}/Godeps/_workspace:$GOPATH"
@@ -24,9 +24,6 @@ before_script:
     - godep restore
 
 script: make citest
-
-# after_script:
-#     - goveralls -coverprofile=fluid.coverprofile -service=travis-ci -repotoken $COVERALLS_TOKEN
 
 notifications:
     email:

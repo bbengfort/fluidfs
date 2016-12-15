@@ -21,11 +21,11 @@ fmt:
 	-gofmt -w .
 
 # Target for simple testing on the command line
-test: 
+test:
 	ginkgo -r -v
 
 # Target for testing in continuous integration
-citest: 
+citest: deps
 	ginkgo -r -v --randomizeAllSpecs --randomizeSuites --failOnPending --cover --trace --race --compilers=2
 
 # Clean build files
