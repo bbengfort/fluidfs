@@ -4,7 +4,7 @@
 
 ## Replication
 
-FluidFS will have three modes of operation with to primary protocols. The consistency protocols include:
+FluidFS will have three modes of operation with two primary protocols. The consistency protocols include:
 
 - Basic Raft
 - Hierarchical Consensus
