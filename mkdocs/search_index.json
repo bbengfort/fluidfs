@@ -1,0 +1,44 @@
+{
+    "docs": [
+        {
+            "location": "/",
+            "text": "Welcome to FluidFS\n\n\nFluidFS is a highly consistent distributed file system built with FUSE.",
+            "title": "Introduction"
+        },
+        {
+            "location": "/#welcome-to-fluidfs",
+            "text": "FluidFS is a highly consistent distributed file system built with FUSE.",
+            "title": "Welcome to FluidFS"
+        },
+        {
+            "location": "/architecture/",
+            "text": "Architecture",
+            "title": "Architecture"
+        },
+        {
+            "location": "/architecture/#architecture",
+            "text": "",
+            "title": "Architecture"
+        },
+        {
+            "location": "/about/",
+            "text": "About",
+            "title": "FluidFS"
+        },
+        {
+            "location": "/about/#about",
+            "text": "",
+            "title": "About"
+        },
+        {
+            "location": "/changelog/",
+            "text": "Changelog",
+            "title": "Changelog"
+        },
+        {
+            "location": "/changelog/#changelog",
+            "text": "",
+            "title": "Changelog"
+        }
+    ]
+}
