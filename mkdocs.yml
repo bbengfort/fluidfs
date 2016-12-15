@@ -14,7 +14,7 @@ pages:
         - "Changelog": changelog.md
 
 remote_branch: gh-pages
-remote_name: gh-pages
+remote_name: origin
 edit_uri: edit/master/docs/
 
-google_analytics: ['UA-8096804-12', 'bbengfort.github.io/fluidfs']
+google_analytics: ['UA-8096804-12', 'auto']
