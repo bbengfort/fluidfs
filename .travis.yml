@@ -1,26 +1,16 @@
 langauge: go
 
 go:
-    - 1.6
     - 1.7
 
 before_install:
     - cp .netrc ~
-
-install:
-    # Add Godeps dependencies to GOPATH and PATH
-#    - export GOPATH="${TRAVIS_BUILD_DIR}:$GOPATH"
-#    - export GOPATH="${TRAVIS_BUILD_DIR}/Godeps/_workspace:$GOPATH"
-#    - export PATH="${TRAVIS_BUILD_DIR}/Godeps/_workspace/bin:$PATH"
-#    - export PATH=$PATH:$HOME/gopath/bin
     - go get github.com/tools/godep
 
-    # Install the testing specific dependencies
+install:
     - go get -v github.com/onsi/ginkgo/ginkgo
     - go get -v github.com/onsi/gomega
     - go get github.com/mattn/goveralls
-
-    # Install the project specific dependencies
     - godep restore
 
 script: make citest
