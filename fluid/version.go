@@ -1,6 +1,6 @@
 // Handles the version of FluidFS
 
-package version
+package fluid
 
 func Version() string {
 	return "0.1"

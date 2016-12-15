@@ -1,7 +1,7 @@
-package version_test
+package fluid_test
 
 import (
-	. "github.com/bbengfort/fluidfs/fluid/version"
+	. "github.com/bbengfort/fluidfs/fluid"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
