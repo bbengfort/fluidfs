@@ -1,3 +1,3 @@
-# Welcome to FlowFS
+# Welcome to FluidFS
 
-Flow is a highly consistent distributed file system built with FUSE.
+FluidFS is a highly consistent distributed file system built with FUSE.

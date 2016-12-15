@@ -7,6 +7,7 @@
 _obj
 _test
 _bin
+_build
 
 # Architecture specific extensions/prefixes
 *.[568vq]
@@ -26,3 +27,12 @@ _testmain.go
 
 # OS X Stuff
 .DS_Store
+
+# Coverage
+*.coverprofile
+
+# Configuration
+.env
+
+# Documentation
+site
