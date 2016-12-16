@@ -4,7 +4,7 @@ repo_url: https://github.com/bbengfort/fluidfs
 site_description: A highly consistent distributed filesystem.
 site_author: Benjamin Bengfort and Pete Keleher
 copyright: Built at the University of Maryland, licensed by <a rel="license" href="http://creativecommons.org/licenses/by-nc-sa/4.0/"><img alt="Creative Commons License" style="border-width:0" src="https://i.creativecommons.org/l/by-nc-sa/4.0/80x15.png" /></a>
-theme: simplex
+theme: yeti
 
 pages:
     - "Introduction": index.md
@@ -15,6 +15,6 @@ pages:
 
 remote_branch: gh-pages
 remote_name: origin
-edit_uri: edit/master/docs/
+edit_uri: edit/develop/docs/
 
 google_analytics: ['UA-8096804-12', 'auto']
