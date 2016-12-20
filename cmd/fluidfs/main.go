@@ -1,4 +1,4 @@
-// CLI client to the FluidFS replica daemon.
+// FluidFS replica daemon process
 package main
 
 import (
@@ -11,8 +11,8 @@ import (
 func main() {
 
 	app := cli.NewApp()
-	app.Name = "fluid"
-	app.Usage = "FluidFS replica client for status and control."
+	app.Name = "fluidfs"
+	app.Usage = "A highly consistent distributed filesystem."
 	app.Version = fluid.Version()
 	app.Author = "Benjamin Bengfort"
 	app.Email = "bengfort@cs.umd.edu"

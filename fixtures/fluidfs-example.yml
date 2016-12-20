@@ -1,0 +1,29 @@
+# This is an example configuration for FluidFS
+# Modify to your local settings, rename and place in one of the following:
+#
+#   - /etc/fluidfs/fluidfs.yml
+#   - ~/.fluidfs/fluidfs.yml
+#   - $(pwd)/fluidfs.yml
+#
+# Note is preferable to store configurations in /etc/fluidfs
+
+# If debug is true, then the app will behave in a debugging fashion
+debug: true
+
+# The process id (or precedence id) must be unique across all replicas and
+# determines presidence during version conflicts.
+pid: null
+
+# The hostname of the local device (must be unique)
+hostname: null
+
+# The IP address of the local device to listen for connections on.
+# Note that this must be a well formed IP address, and can contain an optional
+# port number at the end. IP addresses are resolved as follows:
+#   192.168.1.1:0 --> 192.169.1.1:4157
+#   null  --> autoip:4157
+#   :4444 --> autoip:4444
+# where autoip automatically detects the external ip address of the machine
+# and the default port of the app is 4157.
+# Note that when using autoip, other replicas must be notified of the address.
+addr: ":4157"
