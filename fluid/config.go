@@ -1,3 +1,5 @@
+// Mechanisms for interacting with configuration YAML files on disk.
+
 package fluid
 
 import (
@@ -12,7 +14,7 @@ import (
 )
 
 //===========================================================================
-// Structs and Interfaces
+// Config Structs and Interfaces
 //===========================================================================
 
 // Configuration is an interface for all Config objects and provides a
@@ -28,10 +30,11 @@ type Configuration interface {
 // from YAML configuration files and supplies the primary inputs to the
 // FluidFS server as well as connection interfaces to clients.
 type Config struct {
-	Debug    bool   `yaml:"debug"`    // Whether or not we're in debug mode
-	PID      int    `yaml:"pid"`      // Used to determine replica presidence
-	Hostname string `yaml:"hostname"` // The name of the local device
-	Addr     string `yaml:"addr"`     // The listen address of the local device
+	Debug    bool           `yaml:"debug"`    // Whether or not we're in debug mode
+	PID      int            `yaml:"pid"`      // Used to determine replica presidence
+	Hostname string         `yaml:"hostname"` // The name of the local device
+	Addr     string         `yaml:"addr"`     // The listen address of the local device
+	Logging  *LoggingConfig `yaml:"logging"`  // Configuration for logging
 }
 
 //===========================================================================
@@ -127,6 +130,10 @@ func (conf *Config) Defaults() error {
 		conf.Hostname = name
 	}
 
+	// Create the logging configuration and call its defaults.
+	conf.Logging = new(LoggingConfig)
+	conf.Logging.Defaults()
+
 	return nil
 }
 
@@ -143,16 +150,74 @@ func (conf *Config) Validate() error {
 		return errors.New("Improperly configured: a hostname is required.")
 	}
 
+	// Validate the LoggingConfig
+	if err := conf.Logging.Validate(); err != nil {
+		return err
+	}
+
 	return nil
 }
 
 // Environ sets configurations from the environment.
 func (conf *Config) Environ() error {
+	// Make sure the logging configuration can get environment variables.
+	if err := conf.Logging.Environ(); err != nil {
+		return err
+	}
+
 	return nil
 }
 
 // String returns a pretty representation of the Configuration.
 func (conf *Config) String() string {
 	output := fmt.Sprintf("%s configuration (debug = %t)", conf.Hostname, conf.Debug)
+	output += conf.Logging.String()
+	return output
+}
+
+//===========================================================================
+// Logging Configuration
+//===========================================================================
+
+// LoggingConfig is passed to the InitLogger function to create meaningful,
+// leveled logging to a file or to stdout depending on the configuration.
+type LoggingConfig struct {
+	Level string `yaml:"level"` // specifies the minimum log level
+	Path  string `yaml:"path"`  // optional path to location on disk to write file
+}
+
+// Defaults sets the reasonable defaults on the LoggingConfig object.
+func (conf *LoggingConfig) Defaults() error {
+	// LogLevel is INFO by default.
+	conf.Level = "INFO"
+	return nil
+}
+
+// Validate ensures that required logging settings are correct
+func (conf *LoggingConfig) Validate() error {
+
+	// Return an error if the log level is incorrect.
+	if !ListContains(conf.Level, levelNames) {
+		msg := "Improperly Configured: '%s' is not a valid log level."
+		return fmt.Errorf(msg, conf.Level)
+	}
+
+	return nil
+}
+
+// Environ sets the logging conifguration from the environment.
+func (conf *LoggingConfig) Environ() error {
+	return nil
+}
+
+// String returns a pretty representation of the logging configuration.
+func (conf *LoggingConfig) String() string {
+
+	path := conf.Path
+	if conf.Path == "" {
+		path = "stdout"
+	}
+
+	output := fmt.Sprintf("%s logging to %s", conf.Level, path)
 	return output
 }

@@ -27,3 +27,12 @@ hostname: null
 # and the default port of the app is 4157.
 # Note that when using autoip, other replicas must be notified of the address.
 addr: ":4157"
+
+# Configuration for application logging
+logging:
+
+    # The log level can be one of DEBUG, INFO, WARN, ERROR or FATAL
+    level: INFO
+
+    # Specify a path to log to a file, if null or empty will log to stdout
+    path: null
