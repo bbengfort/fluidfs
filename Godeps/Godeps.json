@@ -7,6 +7,15 @@
 	],
 	"Deps": [
 		{
+			"ImportPath": "github.com/boltdb/bolt",
+			"Comment": "v1.3.0-36-gd98e43f",
+			"Rev": "d98e43f69eae1c8e433703c587484b355d641e2d"
+		},
+		{
+			"ImportPath": "github.com/golang/snappy",
+			"Rev": "d9eb7a3d35ec988b8585d4a0068e462c27d28380"
+		},
+		{
 			"ImportPath": "github.com/onsi/ginkgo",
 			"Comment": "v1.2.0-87-g00054c0",
 			"Rev": "00054c0bb96fc880d4e0be1b90937fad438c5290"
@@ -150,6 +159,54 @@
 			"ImportPath": "github.com/onsi/gomega/types",
 			"Comment": "v1.0-151-gf1f0f38",
 			"Rev": "f1f0f388b31eca4e2cbe7a6dd8a3a1dfddda5b1c"
+		},
+		{
+			"ImportPath": "github.com/syndtr/goleveldb/leveldb",
+			"Rev": "6b4daa5362b502898ddf367c5c11deb9e7a5c727"
+		},
+		{
+			"ImportPath": "github.com/syndtr/goleveldb/leveldb/cache",
+			"Rev": "6b4daa5362b502898ddf367c5c11deb9e7a5c727"
+		},
+		{
+			"ImportPath": "github.com/syndtr/goleveldb/leveldb/comparer",
+			"Rev": "6b4daa5362b502898ddf367c5c11deb9e7a5c727"
+		},
+		{
+			"ImportPath": "github.com/syndtr/goleveldb/leveldb/errors",
+			"Rev": "6b4daa5362b502898ddf367c5c11deb9e7a5c727"
+		},
+		{
+			"ImportPath": "github.com/syndtr/goleveldb/leveldb/filter",
+			"Rev": "6b4daa5362b502898ddf367c5c11deb9e7a5c727"
+		},
+		{
+			"ImportPath": "github.com/syndtr/goleveldb/leveldb/iterator",
+			"Rev": "6b4daa5362b502898ddf367c5c11deb9e7a5c727"
+		},
+		{
+			"ImportPath": "github.com/syndtr/goleveldb/leveldb/journal",
+			"Rev": "6b4daa5362b502898ddf367c5c11deb9e7a5c727"
+		},
+		{
+			"ImportPath": "github.com/syndtr/goleveldb/leveldb/memdb",
+			"Rev": "6b4daa5362b502898ddf367c5c11deb9e7a5c727"
+		},
+		{
+			"ImportPath": "github.com/syndtr/goleveldb/leveldb/opt",
+			"Rev": "6b4daa5362b502898ddf367c5c11deb9e7a5c727"
+		},
+		{
+			"ImportPath": "github.com/syndtr/goleveldb/leveldb/storage",
+			"Rev": "6b4daa5362b502898ddf367c5c11deb9e7a5c727"
+		},
+		{
+			"ImportPath": "github.com/syndtr/goleveldb/leveldb/table",
+			"Rev": "6b4daa5362b502898ddf367c5c11deb9e7a5c727"
+		},
+		{
+			"ImportPath": "github.com/syndtr/goleveldb/leveldb/util",
+			"Rev": "6b4daa5362b502898ddf367c5c11deb9e7a5c727"
 		},
 		{
 			"ImportPath": "github.com/urfave/cli",
