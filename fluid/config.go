@@ -13,6 +13,9 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+// DefaultPort that the replica listens on
+const DefaultPort = 4157
+
 //===========================================================================
 // Config Structs and Interfaces
 //===========================================================================
@@ -30,11 +33,12 @@ type Configuration interface {
 // from YAML configuration files and supplies the primary inputs to the
 // FluidFS server as well as connection interfaces to clients.
 type Config struct {
-	Debug    bool           `yaml:"debug"`    // Whether or not we're in debug mode
-	PID      int            `yaml:"pid"`      // Used to determine replica presidence
-	Hostname string         `yaml:"hostname"` // The name of the local device
-	Addr     string         `yaml:"addr"`     // The listen address of the local device
-	Logging  *LoggingConfig `yaml:"logging"`  // Configuration for logging
+	PID      int             `yaml:"pid"`      // Used to determine replica presidence
+	Name     string          `yaml:"name"`     // The name of the replica
+	Host     string          `yaml:"host"`     // The listen address or host the replica
+	Port     int             `yaml:"port"`     //  The port the replica listens on
+	Logging  *LoggingConfig  `yaml:"logging"`  // Configuration for logging
+	Database *DatabaseConfig `yaml:"database"` // Database configuration
 }
 
 //===========================================================================
@@ -121,18 +125,22 @@ func (conf *Config) Read(path string) error {
 
 // Defaults sets the reasonable defaults on the Config object.
 func (conf *Config) Defaults() error {
-	// Debug is false by default
-	conf.Debug = false
-
 	// Get the Hostname
 	name, err := os.Hostname()
 	if err == nil {
-		conf.Hostname = name
+		conf.Name = name
 	}
+
+	// Set the default Port
+	conf.Port = DefaultPort
 
 	// Create the logging configuration and call its defaults.
 	conf.Logging = new(LoggingConfig)
 	conf.Logging.Defaults()
+
+	// Create the database configuration and call its defaults.
+	conf.Database = new(DatabaseConfig)
+	conf.Database.Defaults()
 
 	return nil
 }
@@ -145,13 +153,18 @@ func (conf *Config) Validate() error {
 		return errors.New("Improperly configured: no precedence ID (pid) set.")
 	}
 
-	// Return an error if there is no Hostname
-	if conf.Hostname == "" {
-		return errors.New("Improperly configured: a hostname is required.")
+	// Return an error if there is no replica name
+	if conf.Name == "" {
+		return errors.New("Improperly configured: a name is required.")
 	}
 
 	// Validate the LoggingConfig
 	if err := conf.Logging.Validate(); err != nil {
+		return err
+	}
+
+	// Validate the DatabaseConfig
+	if err := conf.Database.Validate(); err != nil {
 		return err
 	}
 
@@ -165,13 +178,19 @@ func (conf *Config) Environ() error {
 		return err
 	}
 
+	// Make sure the database configuration can get environment variables.
+	if err := conf.Database.Environ(); err != nil {
+		return err
+	}
+
 	return nil
 }
 
 // String returns a pretty representation of the Configuration.
 func (conf *Config) String() string {
-	output := fmt.Sprintf("%s configuration (debug = %t)", conf.Hostname, conf.Debug)
-	output += conf.Logging.String()
+	output := fmt.Sprintf("%s configuration (%s:%d)", conf.Name, conf.Host, conf.Port)
+	output += "\n" + conf.Database.String()
+	output += "\n" + conf.Logging.String()
 	return output
 }
 
@@ -220,4 +239,57 @@ func (conf *LoggingConfig) String() string {
 
 	output := fmt.Sprintf("%s logging to %s", conf.Level, path)
 	return output
+}
+
+//===========================================================================
+// Database Configuration
+//===========================================================================
+
+// DatabaseConfig is passed to the InitDatabase function to correctly open the
+// right type of database and Database interface.
+type DatabaseConfig struct {
+	Driver string `yaml:"driver"` // specifies the database interface to use
+	Path   string `yaml:"path"`   // optional path to location on disk to write file
+}
+
+// Defaults sets the reasonable defaults on the DatabaseConfig object.
+func (conf *DatabaseConfig) Defaults() error {
+
+	// The default driver is the boltdb driver
+	conf.Driver = "boltdb"
+
+	// The default path to the database is in a hidden directory in the home
+	// directory of the user, namely ~/.fluid/cache.db
+	usr, err := user.Current()
+	if err == nil {
+		conf.Path = filepath.Join(usr.HomeDir, ".fluid", "cache.bdb")
+	}
+
+	return nil
+}
+
+// Validate ensures that required database settings are correct
+func (conf *DatabaseConfig) Validate() error {
+
+	// Ensure that the driver is in the list of drivers.
+	if !ListContains(conf.Driver, databaseDriverNames) {
+		return fmt.Errorf("Improperly configured: '%s' is not a valid database driver", conf.Driver)
+	}
+
+	// Ensure that a path has been passed in.
+	if conf.Path == "" {
+		return errors.New("Improperly configured: must specify a path to the database")
+	}
+
+	return nil
+}
+
+// Environ sets the database conifguration from the environment.
+func (conf *DatabaseConfig) Environ() error {
+	return nil
+}
+
+// String returns a pretty representation of the database configuration.
+func (conf *DatabaseConfig) String() string {
+	return fmt.Sprintf("%s at %s", conf.Driver, conf.Path)
 }

@@ -7,26 +7,22 @@
 #
 # Note is preferable to store configurations in /etc/fluidfs
 
-# If debug is true, then the app will behave in a debugging fashion
-debug: true
-
 # The process id (or precedence id) must be unique across all replicas and
 # determines presidence during version conflicts.
 pid: null
 
-# The hostname of the local device (must be unique)
-hostname: null
+# The replica name (must be unique), usually the hostname of the device.
+# Note if Name is null it will be set to the hostname of the device.
+name: null
 
-# The IP address of the local device to listen for connections on.
-# Note that this must be a well formed IP address, and can contain an optional
-# port number at the end. IP addresses are resolved as follows:
-#   192.168.1.1:0 --> 192.169.1.1:4157
-#   null  --> autoip:4157
-#   :4444 --> autoip:4444
-# where autoip automatically detects the external ip address of the machine
-# and the default port of the app is 4157.
-# Note that when using autoip, other replicas must be notified of the address.
-addr: ":4157"
+# The IP address or hostname of the replica to listen for connections on.
+# Note that this must be a well formed IP address, but should not contain a
+# port number suffixed to the address. If null is supplied then FluidFS will
+# do its best to detect the external IP address of the machine and use that.
+host: null
+
+# The port to listen on, the default port is 4157.
+port: 4157
 
 # Configuration for application logging
 logging:
@@ -35,4 +31,14 @@ logging:
     level: INFO
 
     # Specify a path to log to a file, if null or empty will log to stdout
+    path: null
+
+# Configuration for the state cache database
+database:
+
+    # The driver for the database, one of boltdb (default) or leveldb
+    driver: boltdb
+
+    # The path to the database file on disk. If null or ommited, the database
+    # will be created in the user home directory at ~/.fluid/cache.bdb
     path: null
