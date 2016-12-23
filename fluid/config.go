@@ -39,6 +39,7 @@ type Config struct {
 	Port     int             `yaml:"port"`     //  The port the replica listens on
 	Logging  *LoggingConfig  `yaml:"logging"`  // Configuration for logging
 	Database *DatabaseConfig `yaml:"database"` // Database configuration
+	Chunking *ChunkingConfig `yaml:"chunking"` // Chunking configuration
 }
 
 //===========================================================================
@@ -142,6 +143,10 @@ func (conf *Config) Defaults() error {
 	conf.Database = new(DatabaseConfig)
 	conf.Database.Defaults()
 
+	// Create the chunking configuration and call its defaults.
+	conf.Chunking = new(ChunkingConfig)
+	conf.Chunking.Defaults()
+
 	return nil
 }
 
@@ -168,6 +173,11 @@ func (conf *Config) Validate() error {
 		return err
 	}
 
+	// Validate the ChunkingConfig
+	if err := conf.Chunking.Validate(); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -180,6 +190,11 @@ func (conf *Config) Environ() error {
 
 	// Make sure the database configuration can get environment variables.
 	if err := conf.Database.Environ(); err != nil {
+		return err
+	}
+
+	// Make sure the chunking configuration can get environment variables.
+	if err := conf.Chunking.Environ(); err != nil {
 		return err
 	}
 
@@ -256,7 +271,7 @@ type DatabaseConfig struct {
 func (conf *DatabaseConfig) Defaults() error {
 
 	// The default driver is the boltdb driver
-	conf.Driver = "boltdb"
+	conf.Driver = BoltDBDriver
 
 	// The default path to the database is in a hidden directory in the home
 	// directory of the user, namely ~/.fluid/cache.db
@@ -292,4 +307,73 @@ func (conf *DatabaseConfig) Environ() error {
 // String returns a pretty representation of the database configuration.
 func (conf *DatabaseConfig) String() string {
 	return fmt.Sprintf("%s at %s", conf.Driver, conf.Path)
+}
+
+//===========================================================================
+// Chunking Configuration
+//===========================================================================
+
+// ChunkingConfig is passed to the NewChunker function to correctly initialize
+// the chunking mechanism for creating blobs from files.
+type ChunkingConfig struct {
+	Chunks       string `yaml:"chunks"`         // Either "variable" (default) or "fixed"
+	BlockSize    int    `yaml:"block_size:"`    // The target block size for Blobs
+	MinBlockSize int    `yaml:"min_block_size"` // Used in both variable and fixed
+	MaxBlockSize int    `yaml:"max_block_size"` // Used only in variable length chunking
+}
+
+// Defaults sets the reasonable defaults on the ChunkingConfig object.
+func (conf *ChunkingConfig) Defaults() error {
+
+	// Default chunker is variable length Rabin-Karp chunking
+	conf.Chunks = VariableLengthChunking
+
+	// Default target block size is 4096 bytes, though where this comes from
+	// I'm not sure and I'd advocate a larger target block size.
+	conf.BlockSize = 4096
+
+	// Minimum block size is half the target block size
+	conf.MinBlockSize = 2048
+
+	// Maximum block size is double the target block size
+	conf.MaxBlockSize = 8192
+
+	return nil
+}
+
+// Validate ensures that required chunking settings are correct
+func (conf *ChunkingConfig) Validate() error {
+
+	// Ensure that the chunking method is in the list of available methods.
+	if !ListContains(conf.Chunks, chunkingMethodNames) {
+		return fmt.Errorf("Improperly configured: '%s' is not a valid chunking mechanism", conf.Chunks)
+	}
+
+	// Ensure that the block size is greater than zero.
+	if conf.BlockSize < 1 {
+		return errors.New("Improperly configured: must specify a block size greater than 0 bytes.")
+	}
+
+	// Ensure that MaxBlockSize is greater than target and minimum.
+	if conf.MaxBlockSize < conf.BlockSize || conf.MaxBlockSize < conf.MinBlockSize {
+		return errors.New("Improperly configured: maximum block size must be greater than or equal target and minimum block sizes.")
+	}
+
+	// Ensure that MinBlockSize is less than the target and maximum.
+	if conf.MinBlockSize > conf.BlockSize || conf.MinBlockSize > conf.MaxBlockSize {
+		return errors.New("Improperly configured: minimum block size must be less than or equal to the target block size.")
+	}
+
+	return nil
+}
+
+// Environ sets the chunking conifguration from the environment.
+func (conf *ChunkingConfig) Environ() error {
+	return nil
+}
+
+// String returns a pretty representation of the chunking configuration.
+// TODO: Implement the string representation of the configuration.
+func (conf *ChunkingConfig) String() string {
+	return ""
 }

@@ -36,9 +36,30 @@ logging:
 # Configuration for the state cache database
 database:
 
-    # The driver for the database, one of boltdb (default) or leveldb
+    # The driver for the database, either boltdb (default) or leveldb
     driver: boltdb
 
     # The path to the database file on disk. If null or ommited, the database
     # will be created in the user home directory at ~/.fluid/cache.bdb
     path: null
+
+# Configuration for blob chunking
+chunking:
+
+    # Select either variable (default) or fixed length chunking
+    chunks: variable
+
+    # Set the block size in bytes. This is the target block size for variable
+    # length chunking and the size of all chunks (except possibly the last)
+    # for fixed length chunking.
+    block_size: 4096
+
+    # Set the minimum block size in bytes. This is used in both variable and
+    # fixed length chunking. In fixed length chunking it determines whether or
+    # the last block is greater than or small than the block_size.
+    min_block_size: 2048
+
+    # Set the maximal blcok size in bytes. This is only used in variable
+    # length chunking to bound the size of the rolling window. If using fixed
+    # length chunking, set this equal to the block size.
+    max_block_size: 8192

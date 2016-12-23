@@ -48,6 +48,7 @@ var _ = Describe("Config", func() {
 			Ω(config.Port).Should(BeZero())
 			Ω(config.Logging).Should(BeZero())
 			Ω(config.Database).Should(BeZero())
+			Ω(config.Chunking).Should(BeZero())
 
 			// Run the defaults and assert that default values are set.
 			err := config.Defaults()
@@ -57,6 +58,7 @@ var _ = Describe("Config", func() {
 			Ω(config.Port).ShouldNot(BeZero())
 			Ω(config.Logging).ShouldNot(BeZero())
 			Ω(config.Database).ShouldNot(BeZero())
+			Ω(config.Chunking).ShouldNot(BeZero())
 		})
 
 		Context("validation after defaults", func() {
@@ -93,6 +95,14 @@ var _ = Describe("Config", func() {
 				config.PID = 1
 				config.Name = "alaska"
 				config.Database.Driver = "JunoDB"
+				err := config.Validate()
+				Ω(err).ShouldNot(BeNil())
+			})
+
+			It("should validate the chunking configuration", func() {
+				config.PID = 1
+				config.Name = "alaska"
+				config.Chunking.Chunks = "cloudy"
 				err := config.Validate()
 				Ω(err).ShouldNot(BeNil())
 			})
@@ -199,4 +209,96 @@ var _ = Describe("Config", func() {
 
 	})
 
+	Describe("chunking configuration interface", func() {
+
+		It("should load defaults when called", func() {
+			config := new(ChunkingConfig)
+
+			// Assert that config has zero values
+			Ω(config.Chunks).Should(BeZero())
+			Ω(config.BlockSize).Should(BeZero())
+			Ω(config.MinBlockSize).Should(BeZero())
+			Ω(config.MaxBlockSize).Should(BeZero())
+
+			// Call defaults and assert default values
+			config.Defaults()
+			Ω(config.Chunks).ShouldNot(BeZero())
+			Ω(config.BlockSize).ShouldNot(BeZero())
+			Ω(config.MinBlockSize).ShouldNot(BeZero())
+			Ω(config.MaxBlockSize).ShouldNot(BeZero())
+		})
+
+		Context("validation after defaults", func() {
+
+			var config *ChunkingConfig
+
+			BeforeEach(func() {
+				config = new(ChunkingConfig)
+				config.Defaults()
+			})
+
+			It("should not allow bad chunking mechanisms", func() {
+				config.Chunks = "cloudy"
+				err := config.Validate()
+				Ω(err).ShouldNot(BeNil())
+			})
+
+			It("should allow good chunking mechanisms", func() {
+				var chunkNames = []string{
+					"variable", "fixed",
+				}
+
+				for _, chunks := range chunkNames {
+					config.Chunks = chunks
+					err := config.Validate()
+					Ω(err).Should(BeNil())
+				}
+
+			})
+
+			It("should not allow zero block sizes", func() {
+				config.MinBlockSize = 0
+				config.BlockSize = 0
+				err := config.Validate()
+				Ω(err).ShouldNot(BeNil())
+
+				config.MinBlockSize = 10
+				config.BlockSize = 10
+				err = config.Validate()
+				Ω(err).Should(BeNil())
+
+				config.MinBlockSize = -1
+				config.BlockSize = -1
+				err = config.Validate()
+				Ω(err).ShouldNot(BeNil())
+			})
+
+			It("should not allow maximum block sizes less than the target", func() {
+				config.MaxBlockSize = 10
+				config.BlockSize = 1000
+				err := config.Validate()
+				Ω(err).ShouldNot(BeNil())
+
+			})
+
+			It("should not allow maximum block sizes less than the target", func() {
+				config.MaxBlockSize = 10
+				config.MinBlockSize = 1000
+				config.BlockSize = 2000
+				err := config.Validate()
+				Ω(err).ShouldNot(BeNil())
+
+			})
+
+			It("should not allow minimum block sizes greater than the target", func() {
+				config.MinBlockSize = 1000
+				config.BlockSize = 100
+				err := config.Validate()
+				Ω(err).ShouldNot(BeNil())
+
+			})
+
+		})
+
+	})
 })
