@@ -45,6 +45,12 @@ const (
 // BlobExt specifies the extension of blob files on disk
 const BlobExt = ".blob"
 
+// Constants related to Rabin-Karp chunking
+const (
+	RKHashLength = uint64(32)
+	RKPrime      = uint64(31)
+)
+
 // Names of available chunking mechanisms for validation
 var chunkingMethodNames = []string{VariableLengthChunking, FixedLengthChunking}
 
@@ -110,13 +116,17 @@ func NewChunker(data []byte, config *StorageConfig) (Chunker, error) {
 	case FixedLengthChunking:
 		chunker = &FixedLengthChunker{
 			data:         data,
-			blockIndex:   0,
 			blockSize:    config.BlockSize,
 			minBlockSize: config.MinBlockSize,
 		}
 	case VariableLengthChunking:
 		chunker = &RabinKarpChunker{
-			data: data,
+			data:         data,
+			hashLen:      RKHashLength,
+			bytes:        RKPrime,
+			blockSize:    uint64(config.BlockSize),
+			minBlockSize: uint64(config.MinBlockSize),
+			maxBlockSize: uint64(config.MaxBlockSize),
 		}
 	default:
 		return nil, fmt.Errorf("unknown chunking method: '%s'", config.Chunking)
@@ -128,7 +138,11 @@ func NewChunker(data []byte, config *StorageConfig) (Chunker, error) {
 		return nil, err
 	}
 
+	// Prepare the chunker for chunking
 	chunker.SetHasher(hasher)
+	if err := chunker.Reset(); err != nil {
+		return nil, err
+	}
 
 	return chunker, nil
 }
@@ -342,13 +356,20 @@ type FixedLengthChunker struct {
 // of the blockIndex when the data is written. This can be avoided by ensuring
 // that Reset() is called after a Write().
 func (c *FixedLengthChunker) Write(p []byte) (n int, err error) {
-
+	c.data = append(c.data, p...)
 	return len(p), nil
 }
 
 // Next advances the chunker by computing the next blob and modifing its
 // internal indices so that it can be returned via the Chunk() method.
 func (c *FixedLengthChunker) Next() bool {
+	c.blockIndex += c.blockSize
+
+	if c.blockIndex > len(c.data)-c.minBlockSize {
+		c.Reset()
+		return false
+	}
+
 	return true
 }
 
@@ -356,7 +377,28 @@ func (c *FixedLengthChunker) Next() bool {
 // multiple times and will return a new pointer to a new struct when called,
 // therefore it is advisable to only call the method once.
 func (c *FixedLengthChunker) Chunk() Chunk {
-	return &Blob{}
+
+	// Get the end index of the slice
+	endIndex := c.blockIndex + c.blockSize
+
+	// Determine if the block needs to extend over the block size to ensure
+	// the minimum block size is respected
+	if len(c.data)-endIndex < c.minBlockSize {
+		endIndex = len(c.data)
+	}
+
+	// Set the endIndex to prevent overflow
+	if endIndex > len(c.data) {
+		endIndex = len(c.data)
+	}
+
+	// Get the data slice and create the blob.
+	data := c.data[c.blockIndex:endIndex]
+	return &Blob{
+		data: data,
+		hash: c.Signature(data),
+		size: len(data),
+	}
 }
 
 // Reset the chunker back to the first index so that the data structure can
@@ -366,7 +408,11 @@ func (c *FixedLengthChunker) Chunk() Chunk {
 // Note that Reset() will be called after Next() returns false, so without
 // resetting the chunker, every iteration will leave the chunker in a state
 // that it can be iterated over again.
+//
+// Also note that Reset() must be called before any iteration to correctly
+// initialize the blockIndex for the specified block size.
 func (c *FixedLengthChunker) Reset() error {
+	c.blockIndex = -1 * c.blockSize
 	return nil
 }
 
@@ -388,7 +434,15 @@ func (c *FixedLengthChunker) BlockSize() int {
 // over windows of data creating variable length blobs.
 type RabinKarpChunker struct {
 	SignedChunker
-	data []byte // The internal data to chunk on
+	data         []byte   // The internal data to chunk on
+	hashLen      uint64   // The size of the sliding hash window
+	bytes        uint64   // The prime used to compute hashing
+	index        uint64   // The current index of the chunker
+	offset       uint64   // The current offset of the chunker
+	blockSize    uint64   // The target size of the blobs
+	minBlockSize uint64   // The minimium size for a blob
+	maxBlockSize uint64   // The maximum size for a blob
+	saved        []uint64 // Internal window  state
 }
 
 // Write data into a RabinKarpChunker. This method does not reset the
@@ -396,8 +450,32 @@ type RabinKarpChunker struct {
 // of the blockIndex when the data is written. This can be avoided by ensuring
 // that Reset() is called after a Write().
 func (c *RabinKarpChunker) Write(p []byte) (n int, err error) {
-
+	c.data = append(c.data, p...)
 	return len(p), nil
+}
+
+// Offset computes the length of the next block using the current index and
+// remaining length of data.
+func (c *RabinKarpChunker) Offset() uint64 {
+	var offset uint64
+
+	hash := uint64(0)
+	length := uint64(len(c.data)) - c.index
+
+	for offset = uint64(0); (offset < c.hashLen) && (offset < length); offset++ {
+		hash = hash*c.bytes + uint64(c.data[c.index+offset])
+	}
+
+	for offset < length {
+		hash = (hash-c.saved[uint64(c.data[c.index+offset-c.hashLen])])*c.bytes + uint64(c.data[c.index+offset])
+		offset++
+
+		if ((offset >= c.minBlockSize) && (hash%c.blockSize) == 1) || (offset >= c.maxBlockSize) {
+			return offset
+		}
+	}
+
+	return offset
 }
 
 // Next advances the chunker by computing the next blob and modifing its
@@ -405,6 +483,19 @@ func (c *RabinKarpChunker) Write(p []byte) (n int, err error) {
 // advances the chunker in a variable length mechanism as per the Rabin-Karp
 // algorithm.
 func (c *RabinKarpChunker) Next() bool {
+
+	if c.index == 0 && c.offset == 0 {
+		c.offset = c.Offset()
+		return true
+	}
+
+	c.index += c.offset
+	if c.index >= uint64(len(c.data)) {
+		c.Reset()
+		return false
+	}
+
+	c.offset = c.Offset()
 	return true
 }
 
@@ -412,7 +503,12 @@ func (c *RabinKarpChunker) Next() bool {
 // computed through the rolling hash mechanism. Multiple calls to Chunk() will
 // return pointers to new structs, so it may not be adviseable.
 func (c *RabinKarpChunker) Chunk() Chunk {
-	return &Blob{}
+	blob := &Blob{
+		data: c.data[c.index : c.index+c.offset],
+		hash: c.Signature(c.data[c.index : c.index+c.offset]),
+		size: int(c.offset),
+	}
+	return blob
 }
 
 // Reset the chunker back to the first index so that the data structure can
@@ -423,6 +519,21 @@ func (c *RabinKarpChunker) Chunk() Chunk {
 // resetting the chunker, every iteration will leave the chunker in a state
 // that it can be iterated over again.
 func (c *RabinKarpChunker) Reset() error {
+	c.index = 0
+	c.offset = 0
+	c.saved = make([]uint64, 256)
+
+	// Compute the byte index for the saved array
+	bidx := uint64(1)
+	for i := uint64(0); i < (c.hashLen - 1); i++ {
+		bidx *= c.bytes
+	}
+
+	// Initialized the saved array
+	for i := uint64(0); i < 256; i++ {
+		c.saved[i] = i * bidx
+	}
+
 	return nil
 }
 
@@ -431,5 +542,5 @@ func (c *RabinKarpChunker) Reset() error {
 // checked on the Blob data structure. However this method will return the
 // maximal size so that memory can be allocated correctly by callers.
 func (c *RabinKarpChunker) BlockSize() int {
-	return 12
+	return int(c.maxBlockSize)
 }

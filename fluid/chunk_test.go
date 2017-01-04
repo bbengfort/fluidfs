@@ -348,10 +348,367 @@ var _ = Describe("Chunk", func() {
 
 	Describe("fixed length chunking", func() {
 
+		var config *StorageConfig
+		var tmpDir string
+		var err error
+
+		BeforeEach(func() {
+
+			tmpDir, err = ioutil.TempDir("", TempDirPrefix)
+			Ω(err).Should(BeNil())
+
+			config = &StorageConfig{
+				Path:         tmpDir,
+				Chunking:     FixedLengthChunking,
+				BlockSize:    512,
+				MinBlockSize: 128,
+				MaxBlockSize: 640,
+				Hashing:      SHA256,
+			}
+
+			Ω(config.Validate()).Should(BeNil())
+		})
+
+		AfterEach(func() {
+			err = os.RemoveAll(tmpDir)
+			Ω(err).Should(BeNil())
+		})
+
+		It("should create a FixedLengthChunker on demand", func() {
+
+			data := []byte(randString(512))
+			chunker, err := NewChunker(data, config)
+			Ω(err).Should(BeNil())
+
+			chunker, ok := chunker.(*FixedLengthChunker)
+			Ω(ok).Should(BeTrue())
+
+			Ω(chunker.BlockSize()).Should(Equal(config.BlockSize))
+
+		})
+
+		It("should create even length chunks", func() {
+			data := []byte(randString(2048))
+			chunker, err := NewChunker(data, config)
+			Ω(err).Should(BeNil())
+
+			chunks := make([]*Blob, 0, 4)
+
+			for chunker.Next() {
+				blob := chunker.Chunk()
+				chunks = append(chunks, blob.(*Blob))
+				Ω(blob.Data()).Should(HaveLen(config.BlockSize))
+				Ω(blob.Hash()).ShouldNot(BeZero())
+			}
+
+			Ω(chunks).Should(HaveLen(4))
+		})
+
+		It("should create a small last chunk bigger than the minimum", func() {
+			data := []byte(randString(2304))
+			chunker, err := NewChunker(data, config)
+			Ω(err).Should(BeNil())
+
+			chunks := make([]*Blob, 0, 5)
+
+			for chunker.Next() {
+				blob := chunker.Chunk()
+				chunks = append(chunks, blob.(*Blob))
+				Ω(len(blob.Data())).Should(BeNumerically(">=", config.MinBlockSize))
+				Ω(blob.Hash()).ShouldNot(BeZero())
+			}
+
+			Ω(chunks).Should(HaveLen(5))
+		})
+
+		It("should respect the minimum blob size", func() {
+			data := []byte(randString(2144))
+			chunker, err := NewChunker(data, config)
+			Ω(err).Should(BeNil())
+
+			chunks := make([]*Blob, 0, 4)
+
+			for chunker.Next() {
+				blob := chunker.Chunk()
+				chunks = append(chunks, blob.(*Blob))
+				Ω(len(blob.Data())).Should(BeNumerically(">=", config.MinBlockSize))
+				Ω(blob.Hash()).ShouldNot(BeZero())
+			}
+
+			Ω(chunks).Should(HaveLen(4))
+		})
+
+		It("should respect the exact minimum blob size", func() {
+			data := []byte(randString(2176))
+			chunker, err := NewChunker(data, config)
+			Ω(err).Should(BeNil())
+
+			chunks := make([]*Blob, 0, 5)
+
+			for chunker.Next() {
+				blob := chunker.Chunk()
+				chunks = append(chunks, blob.(*Blob))
+				Ω(len(blob.Data())).Should(BeNumerically(">=", config.MinBlockSize))
+				Ω(blob.Hash()).ShouldNot(BeZero())
+			}
+
+			Ω(chunks).Should(HaveLen(5))
+		})
+
+		It("should be able to chunk and recombine without errors", func() {
+			data := []byte(randString(2144))
+			chunker, err := NewChunker(data, config)
+			Ω(err).Should(BeNil())
+
+			chunks := make([]*Blob, 0, 4)
+
+			for chunker.Next() {
+				blob := chunker.Chunk()
+				chunks = append(chunks, blob.(*Blob))
+			}
+
+			combined := make([]byte, 0, 2144)
+			for _, blob := range chunks {
+				combined = append(combined, blob.Data()...)
+			}
+
+			Ω(data).Should(Equal(combined))
+		})
+
+		It("should be able to chunk, save to disk, and read without errors", func() {
+			data := []byte(randString(2304))
+			chunker, err := NewChunker(data, config)
+			Ω(err).Should(BeNil())
+
+			paths := make([]string, 0, 5)
+
+			for chunker.Next() {
+				blob := chunker.Chunk().(*Blob)
+				blob.Save(tmpDir)
+				paths = append(paths, blob.Path())
+			}
+
+			fdata := make([]byte, 0, 2304)
+			for _, path := range paths {
+				rdata, err := ioutil.ReadFile(path)
+				Ω(err).Should(BeNil())
+				fdata = append(fdata, rdata...)
+			}
+
+			Ω(data).Should(Equal(fdata))
+
+		})
+
+		It("should be able to chunk foo.txt with default block sizes", func() {
+			fixture := filepath.Join("testdata", "foo.txt")
+			data, err := ioutil.ReadFile(fixture)
+			Ω(err).Should(BeNil())
+
+			config := new(StorageConfig)
+			config.Defaults()
+			config.Path = tmpDir
+			config.Chunking = FixedLengthChunking
+			Ω(config.Validate()).Should(BeNil())
+
+			chunker, err := NewChunker(data, config)
+			Ω(err).Should(BeNil())
+
+			sizes := make([]int, 0, 10)
+
+			for chunker.Next() {
+				blob := chunker.Chunk()
+				sizes = append(sizes, blob.Size())
+			}
+
+			Ω(sizes).Should(HaveLen(10))
+			for i, s := range sizes {
+				if i < 9 {
+					Ω(s).Should(Equal(4096))
+				} else {
+					Ω(s).Should(Equal(5199))
+				}
+			}
+
+		})
+
+		It("should be able to iterate through chunks multiple times (call reset)", func() {
+			data := []byte(randString(3264))
+			chunker, err := NewChunker(data, config)
+			Ω(err).Should(BeNil())
+
+			alpha := make([]*Blob, 0, 8)
+			bravo := make([]*Blob, 0, 8)
+
+			// First iteration
+			for chunker.Next() {
+				alpha = append(alpha, chunker.Chunk().(*Blob))
+			}
+
+			// Second iteration
+			for chunker.Next() {
+				bravo = append(bravo, chunker.Chunk().(*Blob))
+			}
+
+			Ω(alpha).Should(Equal(bravo))
+		})
+
 	})
 
 	Describe("rabin-karp chunking", func() {
 
+		var config *StorageConfig
+		var tmpDir string
+		var err error
+
+		BeforeEach(func() {
+
+			tmpDir, err = ioutil.TempDir("", TempDirPrefix)
+			Ω(err).Should(BeNil())
+
+			config = new(StorageConfig)
+			config.Defaults()
+			config.Path = tmpDir
+			config.Chunking = VariableLengthChunking
+			Ω(config.Validate()).Should(BeNil())
+		})
+
+		It("should create a RabinKarpChunker on demand", func() {
+			data := []byte(randString(512))
+			chunker, err := NewChunker(data, config)
+			Ω(err).Should(BeNil())
+
+			chunker, ok := chunker.(*RabinKarpChunker)
+			Ω(ok).Should(BeTrue())
+
+			Ω(chunker.BlockSize()).Should(Equal(8192))
+
+		})
+
+		It("should create variable length blobs", func() {
+			data := []byte(randString(87542))
+			chunker, err := NewChunker(data, config)
+			Ω(err).Should(BeNil())
+
+			sizes := make([]int, 0, 11)
+
+			// Iterate over the chunks
+			for chunker.Next() {
+				blob := chunker.Chunk().(*Blob)
+
+				Ω(blob.Size()).Should(BeNumerically(">=", config.MinBlockSize))
+				Ω(blob.Size()).Should(BeNumerically("<=", config.MaxBlockSize))
+				sizes = append(sizes, blob.Size())
+
+			}
+
+			Ω(len(sizes)).Should(BeNumerically(">", 10))
+
+			sum := 0
+			for _, size := range sizes {
+				sum += size
+			}
+			Ω(sum).Should(Equal(87542))
+		})
+
+		It("should be able to chunk foo.txt with default block sizes", func() {
+
+			/*
+			   Target for foo.txt:
+			   Chunk at offset       0, len 8118
+			   Chunk at offset    8118, len 3638
+			   Chunk at offset   11756, len 3286
+			   Chunk at offset   15042, len 2479
+			   Chunk at offset   17521, len 8192
+			   Chunk at offset   25713, len 2841
+			   Chunk at offset   28554, len 2705
+			   Chunk at offset   31259, len 5685
+			   Chunk at offset   36944, len 5119
+			*/
+
+			fixture := filepath.Join("testdata", "foo.txt")
+			expected := []int{8118, 3638, 3286, 2479, 8192, 2841, 2705, 5685, 5119}
+
+			data, err := ioutil.ReadFile(fixture)
+			Ω(err).Should(BeNil())
+
+			chunker, err := NewChunker(data, config)
+			Ω(err).Should(BeNil())
+
+			sizes := make([]int, 0, 9)
+			for chunker.Next() {
+				sizes = append(sizes, chunker.Chunk().Size())
+			}
+
+			Ω(sizes).Should(HaveLen(9))
+			Ω(sizes).Should(Equal(expected))
+		})
+
+		It("should be able to iterate through chunks multiple times (call reset)", func() {
+			data := []byte(randString(32640))
+			chunker, err := NewChunker(data, config)
+			Ω(err).Should(BeNil())
+
+			alpha := make([]*Blob, 0, 5)
+			bravo := make([]*Blob, 0, 5)
+
+			// First iteration
+			for chunker.Next() {
+				alpha = append(alpha, chunker.Chunk().(*Blob))
+			}
+
+			// Second iteration
+			for chunker.Next() {
+				bravo = append(bravo, chunker.Chunk().(*Blob))
+			}
+
+			Ω(len(alpha)).Should(BeNumerically(">", 3))
+			Ω(len(bravo)).Should(BeNumerically(">", 3))
+			Ω(alpha).Should(Equal(bravo))
+		})
+
+		It("should be able to chunk and recombine without errors", func() {
+			data := []byte(randString(96524))
+			chunker, err := NewChunker(data, config)
+			Ω(err).Should(BeNil())
+
+			chunks := make([]*Blob, 0, 4)
+
+			for chunker.Next() {
+				blob := chunker.Chunk()
+				chunks = append(chunks, blob.(*Blob))
+			}
+
+			combined := make([]byte, 0, 2144)
+			for _, blob := range chunks {
+				combined = append(combined, blob.Data()...)
+			}
+
+			Ω(data).Should(Equal(combined))
+		})
+
+		It("should be able to chunk, save to disk, and read without errors", func() {
+			data := []byte(randString(1120304))
+			chunker, err := NewChunker(data, config)
+			Ω(err).Should(BeNil())
+
+			paths := make([]string, 0, 5)
+
+			for chunker.Next() {
+				blob := chunker.Chunk().(*Blob)
+				blob.Save(tmpDir)
+				paths = append(paths, blob.Path())
+			}
+
+			fdata := make([]byte, 0, 2304)
+			for _, path := range paths {
+				rdata, err := ioutil.ReadFile(path)
+				Ω(err).Should(BeNil())
+				fdata = append(fdata, rdata...)
+			}
+
+			Ω(data).Should(Equal(fdata))
+
+		})
 	})
 
 })
