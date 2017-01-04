@@ -50,7 +50,7 @@ type Cursor interface {
 
 // InitDatabase uses a database configuration object to select an appropriate
 // driver that implements the Database interface and initializes it.
-func InitDatabase(config *DatabaseConfig) (*Database, error) {
+func InitDatabase(config *DatabaseConfig) (Database, error) {
 
 	var db Database
 
@@ -65,5 +65,5 @@ func InitDatabase(config *DatabaseConfig) (*Database, error) {
 
 	// Initialize the Database
 	err := db.Init(config.Path)
-	return &db, err
+	return db, err
 }

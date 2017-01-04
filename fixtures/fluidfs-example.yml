@@ -39,15 +39,21 @@ database:
     # The driver for the database, either boltdb (default) or leveldb
     driver: boltdb
 
-    # The path to the database file on disk. If null or ommited, the database
+    # The path to the database file on disk. If null or omitted, the database
     # will be created in the user home directory at ~/.fluid/cache.bdb
     path: null
 
-# Configuration for blob chunking
-chunking:
+# Configuration for blob storage and chunking
+storage:
+
+    # The path on disk to store data blobs. If null or omitted, the storage
+    # directory will be created in the user home directory at ~/.fluid/data/
+    # Note that this path will be created if it doesn't exist and that the user
+    # must have access permissions to it or the FluidFS daemon will not start.
+    path: null
 
     # Select either variable (default) or fixed length chunking
-    chunks: variable
+    chunking: variable
 
     # Set the block size in bytes. This is the target block size for variable
     # length chunking and the size of all chunks (except possibly the last)
@@ -63,3 +69,11 @@ chunking:
     # length chunking to bound the size of the rolling window. If using fixed
     # length chunking, set this equal to the block size.
     max_block_size: 8192
+
+    # Specify the hashing algorithm to use. This algorithm determines how
+    # chunks are uniquely identified by their signature. Different hashing
+    # algorithms have different opportunities for security, performance, and
+    # collision avoidance. The default is sha256. Current options for hashing
+    # include:  md5, sha1, sha224, sha256, and murmur.
+    # Future algorithms to include are: CityHash, FarmHash, and SipHash.
+    hashing: sha256

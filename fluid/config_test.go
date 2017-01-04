@@ -1,6 +1,10 @@
 package fluid_test
 
 import (
+	"io/ioutil"
+	"os"
+	"path/filepath"
+
 	. "github.com/bbengfort/fluidfs/fluid"
 
 	. "github.com/onsi/ginkgo"
@@ -48,7 +52,7 @@ var _ = Describe("Config", func() {
 			Ω(config.Port).Should(BeZero())
 			Ω(config.Logging).Should(BeZero())
 			Ω(config.Database).Should(BeZero())
-			Ω(config.Chunking).Should(BeZero())
+			Ω(config.Storage).Should(BeZero())
 
 			// Run the defaults and assert that default values are set.
 			err := config.Defaults()
@@ -58,7 +62,7 @@ var _ = Describe("Config", func() {
 			Ω(config.Port).ShouldNot(BeZero())
 			Ω(config.Logging).ShouldNot(BeZero())
 			Ω(config.Database).ShouldNot(BeZero())
-			Ω(config.Chunking).ShouldNot(BeZero())
+			Ω(config.Storage).ShouldNot(BeZero())
 		})
 
 		Context("validation after defaults", func() {
@@ -102,7 +106,7 @@ var _ = Describe("Config", func() {
 			It("should validate the chunking configuration", func() {
 				config.PID = 1
 				config.Name = "alaska"
-				config.Chunking.Chunks = "cloudy"
+				config.Storage.Chunking = "cloudy"
 				err := config.Validate()
 				Ω(err).ShouldNot(BeNil())
 			})
@@ -200,6 +204,30 @@ var _ = Describe("Config", func() {
 
 			})
 
+			It("shouldn't allow driver case to matter", func() {
+				var driverNames = []string{
+					"BoltDB", "levelDB", "BOLTDB", "LEVELdb",
+				}
+
+				for _, driver := range driverNames {
+					config.Driver = driver
+					err := config.Validate()
+					Ω(err).Should(BeNil())
+				}
+			})
+
+			It("should allow driver white space to matter", func() {
+				var driverNames = []string{
+					"boltdb ", " leveldb   ", " boltdb",
+				}
+
+				for _, driver := range driverNames {
+					config.Driver = driver
+					err := config.Validate()
+					Ω(err).Should(BeNil())
+				}
+			})
+
 			It("should not allow zero database paths", func() {
 				config.Path = ""
 				Ω(config.Validate()).ShouldNot(BeNil())
@@ -209,36 +237,67 @@ var _ = Describe("Config", func() {
 
 	})
 
-	Describe("chunking configuration interface", func() {
+	Describe("storage configuration interface", func() {
 
 		It("should load defaults when called", func() {
-			config := new(ChunkingConfig)
+			config := new(StorageConfig)
 
 			// Assert that config has zero values
-			Ω(config.Chunks).Should(BeZero())
+			Ω(config.Chunking).Should(BeZero())
 			Ω(config.BlockSize).Should(BeZero())
 			Ω(config.MinBlockSize).Should(BeZero())
 			Ω(config.MaxBlockSize).Should(BeZero())
+			Ω(config.Hashing).Should(BeZero())
 
 			// Call defaults and assert default values
 			config.Defaults()
-			Ω(config.Chunks).ShouldNot(BeZero())
+			Ω(config.Chunking).ShouldNot(BeZero())
 			Ω(config.BlockSize).ShouldNot(BeZero())
 			Ω(config.MinBlockSize).ShouldNot(BeZero())
 			Ω(config.MaxBlockSize).ShouldNot(BeZero())
+			Ω(config.Hashing).ShouldNot(BeZero())
 		})
 
 		Context("validation after defaults", func() {
 
-			var config *ChunkingConfig
+			var config *StorageConfig
+			var tempDir string
+			var err error
 
 			BeforeEach(func() {
-				config = new(ChunkingConfig)
+				config = new(StorageConfig)
 				config.Defaults()
+
+				tempDir, err = ioutil.TempDir("", TempDirPrefix)
+				Ω(err).Should(BeNil())
+				config.Path = tempDir
+			})
+
+			AfterEach(func() {
+				Ω(os.RemoveAll(tempDir)).Should(BeNil())
+			})
+
+			It("should not allow zero storage paths", func() {
+				config.Path = ""
+				Ω(config.Validate()).ShouldNot(BeNil())
+			})
+
+			It("should create the storage directory immediately", func() {
+				path := filepath.Join(tempDir, "path", "to", "storage")
+				_, err := os.Stat(path)
+				Ω(os.IsNotExist(err)).Should(BeTrue(), "path existed before testing")
+
+				config.Path = path
+
+				Ω(config.Validate()).Should(BeNil(), "error occurred during validation and should not have")
+
+				info, err := os.Stat(path)
+				Ω(os.IsNotExist(err)).Should(BeFalse(), "path does not exist after validation!")
+				Ω(info.Mode().IsDir()).Should(BeTrue(), "path is not a directory!")
 			})
 
 			It("should not allow bad chunking mechanisms", func() {
-				config.Chunks = "cloudy"
+				config.Chunking = "cloudy"
 				err := config.Validate()
 				Ω(err).ShouldNot(BeNil())
 			})
@@ -249,11 +308,35 @@ var _ = Describe("Config", func() {
 				}
 
 				for _, chunks := range chunkNames {
-					config.Chunks = chunks
+					config.Chunking = chunks
 					err := config.Validate()
 					Ω(err).Should(BeNil())
 				}
 
+			})
+
+			It("shouldn't allow chunks case to matter", func() {
+				var methodNames = []string{
+					"Variable", "FIXED", "vaRIAble", "variable",
+				}
+
+				for _, method := range methodNames {
+					config.Chunking = method
+					err := config.Validate()
+					Ω(err).Should(BeNil())
+				}
+			})
+
+			It("should allow chunks white space to matter", func() {
+				var methodNames = []string{
+					"variable ", "fixed ", " variable ", "    fixed   ",
+				}
+
+				for _, method := range methodNames {
+					config.Chunking = method
+					err := config.Validate()
+					Ω(err).Should(BeNil())
+				}
 			})
 
 			It("should not allow zero block sizes", func() {
@@ -296,6 +379,49 @@ var _ = Describe("Config", func() {
 				err := config.Validate()
 				Ω(err).ShouldNot(BeNil())
 
+			})
+
+			It("should not allow bad hashing alogrithms", func() {
+				config.Hashing = "protobob"
+				err := config.Validate()
+				Ω(err).ShouldNot(BeNil())
+			})
+
+			It("should allow good hashing alogrithms", func() {
+				var chunkNames = []string{
+					"md5", "sha1", "sha224", "sha256", "murmur",
+				}
+
+				for _, chunks := range chunkNames {
+					config.Hashing = chunks
+					err := config.Validate()
+					Ω(err).Should(BeNil())
+				}
+
+			})
+
+			It("shouldn't allow hashing case to matter", func() {
+				var driverNames = []string{
+					"MD5", "Sha1", "SHA224", "sHA256", "Murmur",
+				}
+
+				for _, driver := range driverNames {
+					config.Hashing = driver
+					err := config.Validate()
+					Ω(err).Should(BeNil())
+				}
+			})
+
+			It("should allow hashing white space to matter", func() {
+				var driverNames = []string{
+					"md5 ", "sha256 ", " sha224 ", "   murmur   ",
+				}
+
+				for _, driver := range driverNames {
+					config.Hashing = driver
+					err := config.Validate()
+					Ω(err).Should(BeNil())
+				}
 			})
 
 		})

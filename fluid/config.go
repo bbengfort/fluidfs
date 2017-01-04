@@ -39,7 +39,7 @@ type Config struct {
 	Port     int             `yaml:"port"`     //  The port the replica listens on
 	Logging  *LoggingConfig  `yaml:"logging"`  // Configuration for logging
 	Database *DatabaseConfig `yaml:"database"` // Database configuration
-	Chunking *ChunkingConfig `yaml:"chunking"` // Chunking configuration
+	Storage  *StorageConfig  `yaml:"storage"`  // Storage/Chunking configuration
 }
 
 //===========================================================================
@@ -143,9 +143,9 @@ func (conf *Config) Defaults() error {
 	conf.Database = new(DatabaseConfig)
 	conf.Database.Defaults()
 
-	// Create the chunking configuration and call its defaults.
-	conf.Chunking = new(ChunkingConfig)
-	conf.Chunking.Defaults()
+	// Create the storage configuration and call its defaults.
+	conf.Storage = new(StorageConfig)
+	conf.Storage.Defaults()
 
 	return nil
 }
@@ -173,8 +173,8 @@ func (conf *Config) Validate() error {
 		return err
 	}
 
-	// Validate the ChunkingConfig
-	if err := conf.Chunking.Validate(); err != nil {
+	// Validate the StorageConfig
+	if err := conf.Storage.Validate(); err != nil {
 		return err
 	}
 
@@ -193,8 +193,8 @@ func (conf *Config) Environ() error {
 		return err
 	}
 
-	// Make sure the chunking configuration can get environment variables.
-	if err := conf.Chunking.Environ(); err != nil {
+	// Make sure the storage configuration can get environment variables.
+	if err := conf.Storage.Environ(); err != nil {
 		return err
 	}
 
@@ -205,6 +205,7 @@ func (conf *Config) Environ() error {
 func (conf *Config) String() string {
 	output := fmt.Sprintf("%s configuration (%s:%d)", conf.Name, conf.Host, conf.Port)
 	output += "\n" + conf.Database.String()
+	output += "\n" + conf.Storage.String()
 	output += "\n" + conf.Logging.String()
 	return output
 }
@@ -286,6 +287,9 @@ func (conf *DatabaseConfig) Defaults() error {
 // Validate ensures that required database settings are correct
 func (conf *DatabaseConfig) Validate() error {
 
+	// Ensure that the driver is all lowercase with whitespace trimmed.
+	conf.Driver = Regularize(conf.Driver)
+
 	// Ensure that the driver is in the list of drivers.
 	if !ListContains(conf.Driver, databaseDriverNames) {
 		return fmt.Errorf("Improperly configured: '%s' is not a valid database driver", conf.Driver)
@@ -310,23 +314,32 @@ func (conf *DatabaseConfig) String() string {
 }
 
 //===========================================================================
-// Chunking Configuration
+// Storage Configuration
 //===========================================================================
 
-// ChunkingConfig is passed to the NewChunker function to correctly initialize
-// the chunking mechanism for creating blobs from files.
-type ChunkingConfig struct {
-	Chunks       string `yaml:"chunks"`         // Either "variable" (default) or "fixed"
+// StorageConfig is passed to the NewChunker function to correctly initialize
+// the storage and chunking mechanism for creating blobs from files.
+type StorageConfig struct {
+	Path         string `yaml:"path"`           // Path to a directory to store blobs on disk
+	Chunking     string `yaml:"chunking"`       // Either "variable" (default) or "fixed"
 	BlockSize    int    `yaml:"block_size:"`    // The target block size for Blobs
 	MinBlockSize int    `yaml:"min_block_size"` // Used in both variable and fixed
 	MaxBlockSize int    `yaml:"max_block_size"` // Used only in variable length chunking
+	Hashing      string `yaml:"hashing"`        // Identifies the hashing algorithm used
 }
 
-// Defaults sets the reasonable defaults on the ChunkingConfig object.
-func (conf *ChunkingConfig) Defaults() error {
+// Defaults sets the reasonable defaults on the StorageConfig object.
+func (conf *StorageConfig) Defaults() error {
+
+	// The default path to the storage path is to a hidden directory in the
+	// home directory of the user, namely ~/.fluid/data/
+	usr, err := user.Current()
+	if err == nil {
+		conf.Path = filepath.Join(usr.HomeDir, ".fluid", "data")
+	}
 
 	// Default chunker is variable length Rabin-Karp chunking
-	conf.Chunks = VariableLengthChunking
+	conf.Chunking = VariableLengthChunking
 
 	// Default target block size is 4096 bytes, though where this comes from
 	// I'm not sure and I'd advocate a larger target block size.
@@ -338,15 +351,42 @@ func (conf *ChunkingConfig) Defaults() error {
 	// Maximum block size is double the target block size
 	conf.MaxBlockSize = 8192
 
+	// Default hashing algorithm is SHA256 to prevent collisions
+	conf.Hashing = SHA256
+
 	return nil
 }
 
 // Validate ensures that required chunking settings are correct
-func (conf *ChunkingConfig) Validate() error {
+func (conf *StorageConfig) Validate() error {
+
+	// Return an error if there is no storage path
+	if conf.Path == "" {
+		return errors.New("Improperly configured: a path to the storage directory is required.")
+	}
+
+	// NOTE: The following happens in validate, e.g. ASAP so that errors happen at startup.
+	// NOTE: Still need to handle errors at write time, just in case things change.
+	// Create the storage path if it does not exist and validate that the user
+	// has permission to read and write to the directory.
+	if _, err := os.Stat(conf.Path); os.IsNotExist(err) {
+		if err := os.MkdirAll(conf.Path, ModeStorageDir); err != nil {
+			return fmt.Errorf("Improperly configured: could not create storage directory at '%s'", conf.Path)
+		}
+	}
+
+	// Ensure that the storage path is a directory just in case.
+	info, _ := os.Stat(conf.Path)
+	if !info.Mode().IsDir() {
+		return errors.New("Improperly configured: storage directory cannot be accessed.")
+	}
+
+	// Ensure that the chunks is all lowercase and whitespace trimmed.
+	conf.Chunking = Regularize(conf.Chunking)
 
 	// Ensure that the chunking method is in the list of available methods.
-	if !ListContains(conf.Chunks, chunkingMethodNames) {
-		return fmt.Errorf("Improperly configured: '%s' is not a valid chunking mechanism", conf.Chunks)
+	if !ListContains(conf.Chunking, chunkingMethodNames) {
+		return fmt.Errorf("Improperly configured: '%s' is not a valid chunking mechanism", conf.Chunking)
 	}
 
 	// Ensure that the block size is greater than zero.
@@ -364,16 +404,23 @@ func (conf *ChunkingConfig) Validate() error {
 		return errors.New("Improperly configured: minimum block size must be less than or equal to the target block size.")
 	}
 
+	// Ensure that hashing is all lowercase and whitespace trimmed.
+	conf.Hashing = Regularize(conf.Hashing)
+
+	// Ensure that the hashing algorithm is in the list of available algorithms.
+	if !ListContains(conf.Hashing, hashingAlgorithmNames) {
+		return fmt.Errorf("Improperly configured: '%s' is not a valid hashing algorithm", conf.Hashing)
+	}
+
 	return nil
 }
 
-// Environ sets the chunking conifguration from the environment.
-func (conf *ChunkingConfig) Environ() error {
+// Environ sets the storage conifguration from the environment.
+func (conf *StorageConfig) Environ() error {
 	return nil
 }
 
-// String returns a pretty representation of the chunking configuration.
-// TODO: Implement the string representation of the configuration.
-func (conf *ChunkingConfig) String() string {
-	return ""
+// String returns a pretty representation of the storage configuration.
+func (conf *StorageConfig) String() string {
+	return fmt.Sprintf("%s length %d byte blobs stored at %s", conf.Chunking, conf.BlockSize, conf.Path)
 }

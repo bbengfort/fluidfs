@@ -98,7 +98,7 @@ var _ = Describe("Logger", func() {
 
 			BeforeEach(func() {
 				// Create a temporary log directory
-				testDir, err = ioutil.TempDir("", "ginkgo-fluid-")
+				testDir, err = ioutil.TempDir("", TempDirPrefix)
 				Ω(err).Should(BeNil())
 
 				// Create a config with the temporary path

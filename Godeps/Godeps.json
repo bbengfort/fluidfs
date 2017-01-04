@@ -161,6 +161,10 @@
 			"Rev": "f1f0f388b31eca4e2cbe7a6dd8a3a1dfddda5b1c"
 		},
 		{
+			"ImportPath": "github.com/spaolacci/murmur3",
+			"Rev": "0d12bf811670bf6a1a63828dfbd003eded177fce"
+		},
+		{
 			"ImportPath": "github.com/syndtr/goleveldb/leveldb",
 			"Rev": "6b4daa5362b502898ddf367c5c11deb9e7a5c727"
 		},
