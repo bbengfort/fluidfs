@@ -1,25 +1,25 @@
 # This is an example configuration for FluidFS
 # Modify to your local settings, rename and place in one of the following:
 #
-#   - /etc/fluidfs/fluidfs.yml
-#   - ~/.fluidfs/fluidfs.yml
+#   - /etc/fluidfs/config.yml
+#   - ~/.fluidfs/config.yml
 #   - $(pwd)/fluidfs.yml
 #
-# Note is preferable to store configurations in /etc/fluidfs
+# Note is preferable to store configurations in ~/.fluidfs/config.yml
 
 # The process id (or precedence id) must be unique across all replicas and
 # determines presidence during version conflicts.
-pid: null
+pid: 0
 
 # The replica name (must be unique), usually the hostname of the device.
 # Note if Name is null it will be set to the hostname of the device.
-name: null
+# name: null
 
 # The IP address or hostname of the replica to listen for connections on.
 # Note that this must be a well formed IP address, but should not contain a
 # port number suffixed to the address. If null is supplied then FluidFS will
 # do its best to detect the external IP address of the machine and use that.
-host: null
+# host: null
 
 # The port to listen on, the default port is 4157.
 port: 4157
@@ -31,7 +31,7 @@ logging:
     level: INFO
 
     # Specify a path to log to a file, if null or empty will log to stdout
-    path: null
+    # path: null
 
 # Configuration for the state cache database
 database:
@@ -41,7 +41,7 @@ database:
 
     # The path to the database file on disk. If null or omitted, the database
     # will be created in the user home directory at ~/.fluid/cache.bdb
-    path: null
+    # path: null
 
 # Configuration for blob storage and chunking
 storage:
@@ -50,7 +50,7 @@ storage:
     # directory will be created in the user home directory at ~/.fluid/data/
     # Note that this path will be created if it doesn't exist and that the user
     # must have access permissions to it or the FluidFS daemon will not start.
-    path: null
+    # path: null
 
     # Select either variable (default) or fixed length chunking
     chunking: variable

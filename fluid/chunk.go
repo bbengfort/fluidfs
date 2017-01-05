@@ -521,17 +521,20 @@ func (c *RabinKarpChunker) Chunk() Chunk {
 func (c *RabinKarpChunker) Reset() error {
 	c.index = 0
 	c.offset = 0
-	c.saved = make([]uint64, 256)
 
-	// Compute the byte index for the saved array
-	bidx := uint64(1)
-	for i := uint64(0); i < (c.hashLen - 1); i++ {
-		bidx *= c.bytes
-	}
+	if c.saved == nil {
+		c.saved = make([]uint64, 256)
 
-	// Initialized the saved array
-	for i := uint64(0); i < 256; i++ {
-		c.saved[i] = i * bidx
+		// Compute the byte index for the saved array
+		bidx := uint64(1)
+		for i := uint64(0); i < (c.hashLen - 1); i++ {
+			bidx *= c.bytes
+		}
+
+		// Initialized the saved array
+		for i := uint64(0); i < 256; i++ {
+			c.saved[i] = i * bidx
+		}
 	}
 
 	return nil

@@ -16,6 +16,12 @@ import (
 // DefaultPort that the replica listens on
 const DefaultPort = 4157
 
+// Configuration directories and fixtures
+const (
+	ConfigDirectory       = "fluidfs"
+	HiddenConfigDirectory = ".fluidfs"
+)
+
 //===========================================================================
 // Config Structs and Interfaces
 //===========================================================================
@@ -33,13 +39,14 @@ type Configuration interface {
 // from YAML configuration files and supplies the primary inputs to the
 // FluidFS server as well as connection interfaces to clients.
 type Config struct {
-	PID      int             `yaml:"pid"`      // Used to determine replica presidence
-	Name     string          `yaml:"name"`     // The name of the replica
-	Host     string          `yaml:"host"`     // The listen address or host the replica
-	Port     int             `yaml:"port"`     //  The port the replica listens on
-	Logging  *LoggingConfig  `yaml:"logging"`  // Configuration for logging
-	Database *DatabaseConfig `yaml:"database"` // Database configuration
-	Storage  *StorageConfig  `yaml:"storage"`  // Storage/Chunking configuration
+	PID      int             `yaml:"pid"`            // Used to determine replica presidence
+	Name     string          `yaml:"name,omitempty"` // The name of the replica
+	Host     string          `yaml:"host,omitempty"` // The listen address or host the replica
+	Port     int             `yaml:"port,omitempty"` //  The port the replica listens on
+	Logging  *LoggingConfig  `yaml:"logging"`        // Configuration for logging
+	Database *DatabaseConfig `yaml:"database"`       // Database configuration
+	Storage  *StorageConfig  `yaml:"storage"`        // Storage/Chunking configuration
+	Loaded   []string        `yaml:"-"`              // Reference to the loaded configuration paths
 }
 
 //===========================================================================
@@ -50,7 +57,10 @@ type Config struct {
 // creating a Config object. It first sets reasonable defaults, then goes
 // through all the yaml config paths and loads their configuration, then
 // sets final variables from the environment before performing validation.
-func LoadConfig() (*Config, error) {
+//
+// An optional parameter, the path to another configuration can be passed in.
+// This configuration will be loaded after the configuration in Paths().
+func LoadConfig(confPath string) (*Config, error) {
 	// Initialize the config
 	conf := new(Config)
 
@@ -63,6 +73,11 @@ func LoadConfig() (*Config, error) {
 	// Note errors are supressed, if no file or bad read, just keep on going.
 	for _, path := range conf.Paths() {
 		conf.Read(path)
+	}
+
+	// Load a configuration that is passed in, ignoring errors
+	if confPath != "" {
+		conf.Read(confPath)
 	}
 
 	// Load environment variables as needed
@@ -86,12 +101,12 @@ func (conf *Config) Paths() []string {
 	paths := make([]string, 0, 4)
 
 	// Add the etc configuration
-	paths = append(paths, "/etc/fluid/fluidfs.yml")
+	paths = append(paths, filepath.Join("/", "etc", ConfigDirectory, "config.yml"))
 
 	// Add the user configuration
 	usr, err := user.Current()
 	if err == nil {
-		yaml := filepath.Join(usr.HomeDir, ".fluid", "fluidfs.yml")
+		yaml := filepath.Join(usr.HomeDir, HiddenConfigDirectory, "config.yml")
 		paths = append(paths, yaml)
 	}
 
@@ -116,6 +131,9 @@ func (conf *Config) Read(path string) error {
 	if err := yaml.Unmarshal(data, conf); err != nil {
 		return err
 	}
+
+	// Add the path to the loaded paths if successful
+	conf.Loaded = append(conf.Loaded, path)
 
 	return nil
 }
@@ -217,8 +235,8 @@ func (conf *Config) String() string {
 // LoggingConfig is passed to the InitLogger function to create meaningful,
 // leveled logging to a file or to stdout depending on the configuration.
 type LoggingConfig struct {
-	Level string `yaml:"level"` // specifies the minimum log level
-	Path  string `yaml:"path"`  // optional path to location on disk to write file
+	Level string `yaml:"level,omitempty"` // specifies the minimum log level
+	Path  string `yaml:"path,omitempty"`  // optional path to location on disk to write file
 }
 
 // Defaults sets the reasonable defaults on the LoggingConfig object.
@@ -264,8 +282,8 @@ func (conf *LoggingConfig) String() string {
 // DatabaseConfig is passed to the InitDatabase function to correctly open the
 // right type of database and Database interface.
 type DatabaseConfig struct {
-	Driver string `yaml:"driver"` // specifies the database interface to use
-	Path   string `yaml:"path"`   // optional path to location on disk to write file
+	Driver string `yaml:"driver,omitempty"` // specifies the database interface to use
+	Path   string `yaml:"path,omitempty"`   // optional path to location on disk to write file
 }
 
 // Defaults sets the reasonable defaults on the DatabaseConfig object.
@@ -275,10 +293,10 @@ func (conf *DatabaseConfig) Defaults() error {
 	conf.Driver = BoltDBDriver
 
 	// The default path to the database is in a hidden directory in the home
-	// directory of the user, namely ~/.fluid/cache.db
+	// directory of the user, namely ~/.fluidfs/cache.db
 	usr, err := user.Current()
 	if err == nil {
-		conf.Path = filepath.Join(usr.HomeDir, ".fluid", "cache.bdb")
+		conf.Path = filepath.Join(usr.HomeDir, HiddenConfigDirectory, "cache.bdb")
 	}
 
 	return nil
@@ -320,22 +338,22 @@ func (conf *DatabaseConfig) String() string {
 // StorageConfig is passed to the NewChunker function to correctly initialize
 // the storage and chunking mechanism for creating blobs from files.
 type StorageConfig struct {
-	Path         string `yaml:"path"`           // Path to a directory to store blobs on disk
-	Chunking     string `yaml:"chunking"`       // Either "variable" (default) or "fixed"
-	BlockSize    int    `yaml:"block_size:"`    // The target block size for Blobs
-	MinBlockSize int    `yaml:"min_block_size"` // Used in both variable and fixed
-	MaxBlockSize int    `yaml:"max_block_size"` // Used only in variable length chunking
-	Hashing      string `yaml:"hashing"`        // Identifies the hashing algorithm used
+	Path         string `yaml:"path,omitempty"`       // Path to a directory to store blobs on disk
+	Chunking     string `yaml:"chunking,omitempty"`   // Either "variable" (default) or "fixed"
+	BlockSize    int    `yaml:"block_size,omitempty"` // The target block size for Blobs
+	MinBlockSize int    `yaml:"min_block_size"`       // Used in both variable and fixed
+	MaxBlockSize int    `yaml:"max_block_size"`       // Used only in variable length chunking
+	Hashing      string `yaml:"hashing,omitempty"`    // Identifies the hashing algorithm used
 }
 
 // Defaults sets the reasonable defaults on the StorageConfig object.
 func (conf *StorageConfig) Defaults() error {
 
 	// The default path to the storage path is to a hidden directory in the
-	// home directory of the user, namely ~/.fluid/data/
+	// home directory of the user, namely ~/.fluidfs/data/
 	usr, err := user.Current()
 	if err == nil {
-		conf.Path = filepath.Join(usr.HomeDir, ".fluid", "data")
+		conf.Path = filepath.Join(usr.HomeDir, HiddenConfigDirectory, "data")
 	}
 
 	// Default chunker is variable length Rabin-Karp chunking

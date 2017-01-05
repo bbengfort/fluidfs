@@ -3,6 +3,7 @@ package fluid_test
 import (
 	"io/ioutil"
 	"os"
+	"os/user"
 	"path/filepath"
 
 	. "github.com/bbengfort/fluidfs/fluid"
@@ -23,11 +24,22 @@ var _ = Describe("Config", func() {
 			Ω(paths).Should(HaveCap(4))
 		})
 
-		It("should return the etc config path", func() {
+		It("should return the /etc config path", func() {
 			config := new(Config)
 			paths := config.Paths()
 
-			Ω(paths).Should(ContainElement("/etc/fluid/fluidfs.yml"))
+			Ω(paths).Should(ContainElement("/etc/fluidfs/config.yml"))
+		})
+
+		It("should return the home directory config path", func() {
+			config := new(Config)
+			paths := config.Paths()
+
+			usr, err := user.Current()
+			Ω(err).Should(BeNil())
+
+			hdc := filepath.Join(usr.HomeDir, ".fluidfs", "config.yml")
+			Ω(paths).Should(ContainElement(hdc))
 		})
 
 		It("should read a YAML file from a path", func() {
