@@ -42,9 +42,17 @@ func (ldb *LevelDB) CreateBucket(bucket string, key []byte) []byte {
 //===========================================================================
 
 // Get a value for a key from a bucket using the LevelDB API
+// NOTE: To maintain compatibility with the BoltDB API this function does not
+// return an error on NotFound but rather returns nil value and nil error.
 func (ldb *LevelDB) Get(key []byte, bucket string) ([]byte, error) {
 	pkey := ldb.CreateBucket(bucket, key)
-	return ldb.db.Get(pkey, nil)
+	val, err := ldb.db.Get(pkey, nil)
+
+	if err == leveldb.ErrNotFound {
+		return nil, nil
+	}
+
+	return val, err
 }
 
 // Put a key/value pair into the bucket using the LevelDB API
