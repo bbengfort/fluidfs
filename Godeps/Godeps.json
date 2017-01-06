@@ -12,8 +12,17 @@
 			"Rev": "d98e43f69eae1c8e433703c587484b355d641e2d"
 		},
 		{
+			"ImportPath": "github.com/elazarl/go-bindata-assetfs",
+			"Rev": "9a6736ed45b44bf3835afeebb3034b57ed329f3e"
+		},
+		{
 			"ImportPath": "github.com/golang/snappy",
 			"Rev": "d9eb7a3d35ec988b8585d4a0068e462c27d28380"
+		},
+		{
+			"ImportPath": "github.com/gorilla/mux",
+			"Comment": "v1.1-27-g757bef9",
+			"Rev": "757bef944d0f21880861c2dd9c871ca543023cba"
 		},
 		{
 			"ImportPath": "github.com/onsi/ginkgo",

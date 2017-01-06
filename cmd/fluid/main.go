@@ -35,6 +35,11 @@ func main() {
 			Usage:  "check the status of the fluidfs server",
 			Action: fluidStatus,
 		},
+		{
+			Name:   "web",
+			Usage:  "get the url to the fluidfs web interface",
+			Action: fluidWeb,
+		},
 	}
 
 	// Run the CLI program and parse the arguments
@@ -55,6 +60,14 @@ func initClient(c *cli.Context) error {
 
 func fluidStatus(c *cli.Context) error {
 	if err := client.Status(); err != nil {
+		return cli.NewExitError(err.Error(), 1)
+	}
+
+	return nil
+}
+
+func fluidWeb(c *cli.Context) error {
+	if err := client.Web(); err != nil {
 		return cli.NewExitError(err.Error(), 1)
 	}
 

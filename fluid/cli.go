@@ -47,6 +47,13 @@ func (c *CLIClient) Status() error {
 	return nil
 }
 
+// Web returns the address to the web interface.
+// TODO: have this function open the default browser.
+func (c *CLIClient) Web() error {
+	fmt.Printf("Access the FluidFS web interface at http://%s/\n", c.PID.Addr())
+	return nil
+}
+
 // Get an http request to the FLuidFS C2S API
 func (c *CLIClient) Get(endpoint string) (map[string]interface{}, error) {
 	url := fmt.Sprintf("http://%s%s", c.PID.Addr(), endpoint)
