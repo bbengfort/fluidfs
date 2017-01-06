@@ -11,6 +11,16 @@
 
 For more information, please see the documentation: [bbengfort.github.io/fluidfs][docs].
 
+## Binary Assets
+
+The web interface for FluidFS are compiled as binary assets along with the fluidfs server. When adding new web interface functionality, ensure that the assets are rebuilt by using the following command:
+
+```
+$ go-bindata-assetfs assets/...
+```
+
+Make sure when you do so, you're in the `fluid` directory. Note that you'll have to change the package of the generated `bindata_assetfs.go` file, and potentially also handle the naming of several of the functions that fail the linter test. For more information on the binary assets, see: [go-bindata-assetfs](https://github.com/elazarl/go-bindata-assetfs).
+
 ## Development
 
 The primary interface is a command line program that interacts directly with the fluid library. Note that `cmd/fluid/main.go` uses the [CLI](https://github.com/urfave/cli) library rather than implementing console commands itself. Building from source is implemented using the included Makefile, which fetches dependencies and builds locally rather than to the `$GOPATH`:

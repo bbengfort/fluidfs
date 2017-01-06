@@ -34,7 +34,8 @@ func signalHandler(s *Server) {
 	// Shutdown now that we've received the signal
 	err := s.Shutdown()
 	if err != nil {
-		s.Logger.Fatal("could not shutdown %s", err.Error())
+		msg := fmt.Sprintf("could not shutdown %s", err.Error())
+		s.Logger.Fatal(msg)
 		os.Exit(1)
 	}
 }
@@ -121,6 +122,11 @@ func (pid *PID) Free() error {
 
 	// Delete the PID file
 	return os.Remove(pid.Path())
+}
+
+// Addr returns the localhost address with the selected PID.
+func (pid *PID) Addr() string {
+	return fmt.Sprintf("localhost:%d", pid.Port)
 }
 
 // FreePort asks the kernel for a free, open port that is ready to use.

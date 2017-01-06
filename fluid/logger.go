@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -164,4 +165,67 @@ func (logger *Logger) Error(msg string, args ...interface{}) {
 // Fatal message helper function
 func (logger *Logger) Fatal(msg string, args ...interface{}) {
 	logger.Log(msg, LevelFatal, args...)
+}
+
+//===========================================================================
+// HTTP logging handler for the C2S API and web interface
+//===========================================================================
+
+// :method :url :status :response-time ms - :res[content-length]
+const webLogFmt = "c2s %s %s %d %s - %d"
+
+// WebLogger is a decorator for http handlers to record HTTP requests using
+// the logger API and syntax, which must be passed in as the first argument.
+func WebLogger(log *Logger, inner http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+
+		lw := &responseLogger{w: w}
+		inner.ServeHTTP(lw, r)
+
+		log.Info(webLogFmt, r.Method, r.RequestURI, lw.Status(), time.Since(start), lw.Size())
+
+	})
+}
+
+// responseLogger is a wrapper of http.ResponseWriter that keeps track of its
+// HTTP status code and body size for reporting to the console.
+type responseLogger struct {
+	w      http.ResponseWriter
+	status int
+	size   int
+}
+
+func (l *responseLogger) Header() http.Header {
+	return l.w.Header()
+}
+
+func (l *responseLogger) Write(b []byte) (int, error) {
+	if l.status == 0 {
+		l.status = http.StatusOK
+	}
+
+	size, err := l.w.Write(b)
+	l.size += size
+	return size, err
+}
+
+func (l *responseLogger) WriteHeader(s int) {
+	l.w.WriteHeader(s)
+	l.status = s
+}
+
+func (l *responseLogger) Status() int {
+	return l.status
+}
+
+func (l *responseLogger) Size() int {
+	return l.size
+}
+
+func (l *responseLogger) Flush() {
+	f, ok := l.w.(http.Flusher)
+	if ok {
+		f.Flush()
+	}
 }

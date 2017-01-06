@@ -3,10 +3,7 @@
 // the web interface, global configuration service and other data services.
 package fluid
 
-import (
-	"fmt"
-	"time"
-)
+import "fmt"
 
 //===========================================================================
 // FluidFS Server
@@ -61,9 +58,6 @@ func (s *Server) Init(conf string) error {
 func (s *Server) Run() error {
 	var err error
 
-	// TODO: How to return any shutdown errors?
-	defer s.Shutdown()
-
 	// Handle any OS Signals
 	go signalHandler(s)
 
@@ -85,17 +79,13 @@ func (s *Server) Run() error {
 	// Log the connection to the database
 	s.Logger.Info("connected to %s", s.Config.Database.String())
 
-	// Just wait until told to stop (for now)
-	counter := 0
-	for {
-		time.Sleep(100 * time.Millisecond)
-		counter++
-		if counter >= 600 {
-			break
-		}
+	// Run the C2S API and web interface
+	// TODO: Run this in a go routine and not as the primary process
+	if err := s.RunC2SAPI(); err != nil {
+		return fmt.Errorf("could not run C2S API and web interface: %s", err.Error())
 	}
 
-	return nil
+	return s.Shutdown()
 }
 
 // Shutdown the server gracefully by unmounting FUSE directories, closing
