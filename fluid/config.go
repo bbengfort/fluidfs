@@ -98,15 +98,19 @@ func LoadConfig(confPath string) (*Config, error) {
 func (conf *Config) Paths() []string {
 
 	// Initialize the list of paths.
-	paths := make([]string, 0, 4)
+	paths := make([]string, 0, 8)
 
 	// Add the etc configuration
 	paths = append(paths, filepath.Join("/", "etc", ConfigDirectory, "config.yml"))
+	paths = append(paths, filepath.Join("/", "etc", ConfigDirectory, "config.yaml"))
 
 	// Add the user configuration
 	usr, err := user.Current()
 	if err == nil {
 		yaml := filepath.Join(usr.HomeDir, HiddenConfigDirectory, "config.yml")
+		paths = append(paths, yaml)
+
+		yaml = filepath.Join(usr.HomeDir, HiddenConfigDirectory, "config.yaml")
 		paths = append(paths, yaml)
 	}
 
@@ -114,7 +118,9 @@ func (conf *Config) Paths() []string {
 	cwd, err := os.Getwd()
 	if err == nil {
 		paths = append(paths, filepath.Join(cwd, "fluidfs.yml"))
+		paths = append(paths, filepath.Join(cwd, "fluidfs.yaml"))
 		paths = append(paths, filepath.Join(cwd, "conf", "fluidfs.yml"))
+		paths = append(paths, filepath.Join(cwd, "conf", "fluidfs.yaml"))
 	}
 
 	return paths

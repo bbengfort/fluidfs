@@ -20,8 +20,8 @@ var _ = Describe("Config", func() {
 			config := new(Config)
 			paths := config.Paths()
 
-			Ω(paths).Should(HaveLen(4))
-			Ω(paths).Should(HaveCap(4))
+			Ω(paths).Should(HaveLen(8))
+			Ω(paths).Should(HaveCap(8))
 		})
 
 		It("should return the /etc config path", func() {

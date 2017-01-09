@@ -18,7 +18,8 @@ type Server struct {
 	PID    *PID     // Process ID and C&C information
 	Config *Config  // The application configuration
 	Logger *Logger  // Application logging and reporting
-	DB     Database // A connection tot he database
+	DB     Database // A connection to the database
+	Web    *C2SAPI  // The listener for command and control.
 }
 
 // Init prepares the server for running by loading the configuration and
@@ -47,6 +48,12 @@ func (s *Server) Init(conf string) error {
 	// Log the initialization from the loaded configurations.
 	for _, path := range s.Config.Loaded {
 		s.Logger.Info("loaded configuration from %s", path)
+	}
+
+	// Initialize the C2S API
+	s.Web = new(C2SAPI)
+	if err = s.Web.Init(s); err != nil {
+		return err
 	}
 
 	return nil
@@ -81,7 +88,7 @@ func (s *Server) Run() error {
 
 	// Run the C2S API and web interface
 	// TODO: Run this in a go routine and not as the primary process
-	if err := s.RunC2SAPI(); err != nil {
+	if err := s.Web.Run(s.PID.Addr()); err != nil {
 		return fmt.Errorf("could not run C2S API and web interface: %s", err.Error())
 	}
 
