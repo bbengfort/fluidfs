@@ -8,7 +8,8 @@
 # Note is preferable to store configurations in ~/.fluidfs/config.yml
 
 # The process id (or precedence id) must be unique across all replicas and
-# determines presidence during version conflicts.
+# determines presidence during version conflicts. If commented out, the
+# replica will select a random number between 1 and 1000.
 pid: 0
 
 # The replica name (must be unique), usually the hostname of the device.

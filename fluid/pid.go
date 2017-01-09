@@ -94,6 +94,11 @@ func (pid *PID) Save() error {
 	path := pid.Path()
 	// Ensure that a PID file does not exist (race possible)
 	if _, err := os.Stat(path); os.IsNotExist(err) {
+		// Make sure the directory exists.
+		if err := os.MkdirAll(filepath.Dir(path), ModeStorageDir); err != nil {
+			return err
+		}
+
 		// Write the JSON representation of the PID file to disk
 		return ioutil.WriteFile(path, data, ModeBlob)
 	}

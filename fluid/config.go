@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -150,6 +151,10 @@ func (conf *Config) Read(path string) error {
 
 // Defaults sets the reasonable defaults on the Config object.
 func (conf *Config) Defaults() error {
+
+	// Select a random process id
+	conf.PID = rand.Intn(1000)
+
 	// Get the Hostname
 	name, err := os.Hostname()
 	if err == nil {
