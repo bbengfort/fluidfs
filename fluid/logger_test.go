@@ -2,6 +2,7 @@ package fluid_test
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -67,7 +68,7 @@ var _ = Describe("Logger", func() {
 				config.Defaults()
 				logger, err = InitLogger(config)
 
-				Ω(err).Should(BeNil())
+				Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 			})
 
 			It("should output to os.Stdout", func() {
@@ -99,7 +100,7 @@ var _ = Describe("Logger", func() {
 			BeforeEach(func() {
 				// Create a temporary log directory
 				testDir, err = ioutil.TempDir("", TempDirPrefix)
-				Ω(err).Should(BeNil())
+				Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 
 				// Create a config with the temporary path
 				config = new(LoggingConfig)
@@ -109,13 +110,13 @@ var _ = Describe("Logger", func() {
 				// Initialize the logger
 				Ω(config.Path).ShouldNot(BeAnExistingFile())
 				logger, err = InitLogger(config)
-				Ω(err).Should(BeNil())
+				Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 			})
 
 			AfterEach(func() {
 				// Delete the temporary log file
 				err = os.RemoveAll(testDir)
-				Ω(err).Should(BeNil())
+				Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 				Ω(config.Path).ShouldNot(BeAnExistingFile())
 			})
 
@@ -130,7 +131,7 @@ var _ = Describe("Logger", func() {
 				logger.Log("definitely should be logged", LevelWarn)
 
 				data, err := ioutil.ReadFile(config.Path)
-				Ω(err).Should(BeNil())
+				Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 
 				lines := strings.Split(string(data), "\n")
 				Ω(lines).Should(HaveLen(3))
@@ -146,7 +147,7 @@ var _ = Describe("Logger", func() {
 				logger.Debug("this is a debug message")
 
 				data, err := ioutil.ReadFile(config.Path)
-				Ω(err).Should(BeNil())
+				Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 
 				Ω(string(data)).Should(MatchRegexp(`DEBUG   \[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[-+]\d{2}:\d{2}\]: this is a debug message`))
 			})
@@ -155,7 +156,7 @@ var _ = Describe("Logger", func() {
 				logger.Info("for your information")
 
 				data, err := ioutil.ReadFile(config.Path)
-				Ω(err).Should(BeNil())
+				Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 
 				Ω(string(data)).Should(MatchRegexp(`INFO    \[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[-+]\d{2}:\d{2}\]: for your information`))
 			})
@@ -164,7 +165,7 @@ var _ = Describe("Logger", func() {
 				logger.Warn("be careful!")
 
 				data, err := ioutil.ReadFile(config.Path)
-				Ω(err).Should(BeNil())
+				Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 
 				Ω(string(data)).Should(MatchRegexp(`WARN    \[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[-+]\d{2}:\d{2}\]: be careful!`))
 			})
@@ -173,7 +174,7 @@ var _ = Describe("Logger", func() {
 				logger.Error("there was a problem!")
 
 				data, err := ioutil.ReadFile(config.Path)
-				Ω(err).Should(BeNil())
+				Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 
 				Ω(string(data)).Should(MatchRegexp(`ERROR   \[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[-+]\d{2}:\d{2}\]: there was a problem!`))
 			})

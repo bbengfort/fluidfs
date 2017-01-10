@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
+	"path/filepath"
 
 	. "github.com/bbengfort/fluidfs/fluid"
 
@@ -37,7 +38,7 @@ var _ = Describe("PID File", func() {
 	It("should be able to select a free and open port", func() {
 		port, err := pid.FreePort()
 
-		Ω(err).Should(BeNil())
+		Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 		Ω(port).ShouldNot(BeZero())
 
 		// Create a listener on the port
@@ -83,7 +84,7 @@ var _ = Describe("PID File", func() {
 
 			// Save the PID file
 			err := pid.Save()
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 
 			// Ensure that the PID is populated
 			Ω(pid.PID).ShouldNot(BeZero())
@@ -107,11 +108,12 @@ var _ = Describe("PID File", func() {
 
 			// Write the test data as JSON
 			data, err := json.Marshal(testData)
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 
 			// And spit it out to a file.
+			os.MkdirAll(filepath.Dir(pid.Path()), ModeStorageDir)
 			err = ioutil.WriteFile(pid.Path(), data, ModeBlob)
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 
 			// Make sure the PID is zeroed out.
 			Ω(pid.PID).Should(BeZero())
@@ -120,7 +122,7 @@ var _ = Describe("PID File", func() {
 
 			// Load the PID file
 			err = pid.Load()
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 
 			// Ensure that the PID is loaded
 			Ω(pid.PID).Should(Equal(23))

@@ -1,6 +1,7 @@
 package fluid_test
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"os/user"
@@ -36,7 +37,7 @@ var _ = Describe("Config", func() {
 			paths := config.Paths()
 
 			usr, err := user.Current()
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 
 			hdc := filepath.Join(usr.HomeDir, ".fluidfs", "config.yml")
 			Ω(paths).Should(ContainElement(hdc))
@@ -68,7 +69,7 @@ var _ = Describe("Config", func() {
 
 			// Run the defaults and assert that default values are set.
 			err := config.Defaults()
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 
 			Ω(config.Name).ShouldNot(BeZero())
 			Ω(config.Port).ShouldNot(BeZero())
@@ -164,7 +165,7 @@ var _ = Describe("Config", func() {
 				for _, level := range levelNames {
 					config.Level = level
 					err := config.Validate()
-					Ω(err).Should(BeNil())
+					Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 				}
 
 			})
@@ -211,7 +212,7 @@ var _ = Describe("Config", func() {
 				for _, driver := range driverNames {
 					config.Driver = driver
 					err := config.Validate()
-					Ω(err).Should(BeNil())
+					Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 				}
 
 			})
@@ -224,7 +225,7 @@ var _ = Describe("Config", func() {
 				for _, driver := range driverNames {
 					config.Driver = driver
 					err := config.Validate()
-					Ω(err).Should(BeNil())
+					Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 				}
 			})
 
@@ -236,7 +237,7 @@ var _ = Describe("Config", func() {
 				for _, driver := range driverNames {
 					config.Driver = driver
 					err := config.Validate()
-					Ω(err).Should(BeNil())
+					Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 				}
 			})
 
@@ -281,7 +282,7 @@ var _ = Describe("Config", func() {
 				config.Defaults()
 
 				tempDir, err = ioutil.TempDir("", TempDirPrefix)
-				Ω(err).Should(BeNil())
+				Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 				config.Path = tempDir
 			})
 
@@ -322,7 +323,7 @@ var _ = Describe("Config", func() {
 				for _, chunks := range chunkNames {
 					config.Chunking = chunks
 					err := config.Validate()
-					Ω(err).Should(BeNil())
+					Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 				}
 
 			})
@@ -335,7 +336,7 @@ var _ = Describe("Config", func() {
 				for _, method := range methodNames {
 					config.Chunking = method
 					err := config.Validate()
-					Ω(err).Should(BeNil())
+					Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 				}
 			})
 
@@ -347,7 +348,7 @@ var _ = Describe("Config", func() {
 				for _, method := range methodNames {
 					config.Chunking = method
 					err := config.Validate()
-					Ω(err).Should(BeNil())
+					Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 				}
 			})
 
@@ -360,7 +361,7 @@ var _ = Describe("Config", func() {
 				config.MinBlockSize = 10
 				config.BlockSize = 10
 				err = config.Validate()
-				Ω(err).Should(BeNil())
+				Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 
 				config.MinBlockSize = -1
 				config.BlockSize = -1
@@ -407,7 +408,7 @@ var _ = Describe("Config", func() {
 				for _, chunks := range chunkNames {
 					config.Hashing = chunks
 					err := config.Validate()
-					Ω(err).Should(BeNil())
+					Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 				}
 
 			})
@@ -420,7 +421,7 @@ var _ = Describe("Config", func() {
 				for _, driver := range driverNames {
 					config.Hashing = driver
 					err := config.Validate()
-					Ω(err).Should(BeNil())
+					Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 				}
 			})
 
@@ -432,7 +433,7 @@ var _ = Describe("Config", func() {
 				for _, driver := range driverNames {
 					config.Hashing = driver
 					err := config.Validate()
-					Ω(err).Should(BeNil())
+					Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 				}
 			})
 

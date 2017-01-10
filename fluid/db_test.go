@@ -1,6 +1,7 @@
 package fluid_test
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -19,7 +20,7 @@ var _ = Describe("Database", func() {
 
 	BeforeEach(func() {
 		tmpDir, err = ioutil.TempDir("", TempDirPrefix)
-		Ω(err).Should(BeNil())
+		Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 
 		config = new(DatabaseConfig)
 		config.Defaults()
@@ -29,17 +30,17 @@ var _ = Describe("Database", func() {
 
 	AfterEach(func() {
 		err = os.RemoveAll(tmpDir)
-		Ω(err).Should(BeNil())
+		Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 	})
 
 	It("should create a BoltDB on demand", func() {
 		config.Driver = BoltDBDriver
 		db, err := InitDatabase(config)
-		Ω(err).Should(BeNil())
+		Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 
 		defer func() {
 			err := db.Close()
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 		}()
 
 		_, ok := db.(*BoltDB)
@@ -49,11 +50,11 @@ var _ = Describe("Database", func() {
 	It("should create a LevelDB on demand", func() {
 		config.Driver = LevelDBDriver
 		db, err := InitDatabase(config)
-		Ω(err).Should(BeNil())
+		Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 
 		defer func() {
 			err := db.Close()
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 		}()
 
 		_, ok := db.(*LevelDB)
@@ -67,12 +68,12 @@ var _ = Describe("Database", func() {
 		BeforeEach(func() {
 			config.Driver = BoltDBDriver
 			db, err = InitDatabase(config)
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 		})
 
 		AfterEach(func() {
 			err := db.Close()
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 		})
 
 		It("should be able to put a key/value into the names bucket and get it back", func() {
@@ -82,11 +83,11 @@ var _ = Describe("Database", func() {
 
 			// Do the Put
 			err := db.Put(key, val, NamesBucket)
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 
 			// Do the Get
 			dval, err := db.Get(key, NamesBucket)
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 			Ω(val).Should(Equal(dval))
 		})
 
@@ -97,20 +98,20 @@ var _ = Describe("Database", func() {
 
 			// Do the Put
 			err := db.Put(key, val, NamesBucket)
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 
 			// Do a Get
 			dval, err := db.Get(key, NamesBucket)
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 			Ω(val).Should(Equal(dval))
 
 			// Do the Delete
 			err = db.Delete(key, NamesBucket)
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 
 			// Do the second Get
 			dval, err = db.Get(key, NamesBucket)
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 			Ω(dval).Should(BeNil())
 		})
 
@@ -125,13 +126,13 @@ var _ = Describe("Database", func() {
 
 			// Perform the Batch insert
 			err := db.Batch(keys, vals, NamesBucket)
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 
 			// Perform Gets to verify
 			for idx, key := range keys {
 				want := vals[idx]
 				got, err := db.Get(key, NamesBucket)
-				Ω(err).Should(BeNil())
+				Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 				Ω(got).Should(Equal(want))
 			}
 		})
@@ -158,12 +159,12 @@ var _ = Describe("Database", func() {
 		BeforeEach(func() {
 			config.Driver = LevelDBDriver
 			db, err = InitDatabase(config)
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 		})
 
 		AfterEach(func() {
 			err := db.Close()
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 		})
 
 		It("should be able to put a key/value into the names bucket and get it back", func() {
@@ -173,11 +174,11 @@ var _ = Describe("Database", func() {
 
 			// Do the Put
 			err := db.Put(key, val, NamesBucket)
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 
 			// Do the Get
 			dval, err := db.Get(key, NamesBucket)
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 			Ω(val).Should(Equal(dval))
 		})
 
@@ -188,20 +189,20 @@ var _ = Describe("Database", func() {
 
 			// Do the Put
 			err := db.Put(key, val, NamesBucket)
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 
 			// Do a Get
 			dval, err := db.Get(key, NamesBucket)
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 			Ω(val).Should(Equal(dval))
 
 			// Do the Delete
 			err = db.Delete(key, NamesBucket)
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 
 			// Do the second Get
 			dval, err = db.Get(key, NamesBucket)
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 			Ω(dval).Should(BeNil())
 		})
 
@@ -216,13 +217,13 @@ var _ = Describe("Database", func() {
 
 			// Perform the Batch insert
 			err := db.Batch(keys, vals, NamesBucket)
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 
 			// Perform Gets to verify
 			for idx, key := range keys {
 				want := vals[idx]
 				got, err := db.Get(key, NamesBucket)
-				Ω(err).Should(BeNil())
+				Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 				Ω(got).Should(Equal(want))
 			}
 		})

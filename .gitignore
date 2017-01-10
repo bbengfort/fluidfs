@@ -33,6 +33,7 @@ _testmain.go
 
 # Configuration
 .env
+.fluidfs_profile
 
 # Documentation
 site

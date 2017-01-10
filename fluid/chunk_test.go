@@ -2,6 +2,7 @@ package fluid_test
 
 import (
 	"crypto/rand"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -21,7 +22,7 @@ var _ = Describe("Chunk", func() {
 			names := []string{"md5", "sha1", "sha224", "sha256", "murmur"}
 			for _, name := range names {
 				hasher, err := CreateHasher(name)
-				Ω(err).Should(BeNil())
+				Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 
 				hash := hasher()
 				hash.Write([]byte("This is a test string"))
@@ -48,7 +49,7 @@ var _ = Describe("Chunk", func() {
 			// Create the signed chunker
 			chunker := new(SignedChunker)
 			hasher, err := CreateHasher(MD5)
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 			chunker.SetHasher(hasher)
 
 			var sigTests = []struct {
@@ -72,7 +73,7 @@ var _ = Describe("Chunk", func() {
 			// Create the signed chunker
 			chunker := new(SignedChunker)
 			hasher, err := CreateHasher(SHA1)
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 			chunker.SetHasher(hasher)
 
 			var sigTests = []struct {
@@ -96,7 +97,7 @@ var _ = Describe("Chunk", func() {
 			// Create the signed chunker
 			chunker := new(SignedChunker)
 			hasher, err := CreateHasher(SHA224)
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 			chunker.SetHasher(hasher)
 
 			var sigTests = []struct {
@@ -120,7 +121,7 @@ var _ = Describe("Chunk", func() {
 			// Create the signed chunker
 			chunker := new(SignedChunker)
 			hasher, err := CreateHasher(SHA256)
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 			chunker.SetHasher(hasher)
 
 			var sigTests = []struct {
@@ -144,7 +145,7 @@ var _ = Describe("Chunk", func() {
 			// Create the signed chunker
 			chunker := new(SignedChunker)
 			hasher, err := CreateHasher(Murmur)
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 			chunker.SetHasher(hasher)
 
 			var sigTests = []struct {
@@ -172,7 +173,7 @@ var _ = Describe("Chunk", func() {
 
 			for _, data := range cases {
 				length, err := rand.Read(data)
-				Ω(err).Should(BeNil())
+				Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 				Ω(length).Should(Equal(7168))
 			}
 
@@ -184,7 +185,7 @@ var _ = Describe("Chunk", func() {
 
 				// Create the first hasher
 				hasher, err := CreateHasher(name)
-				Ω(err).Should(BeNil())
+				Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 				signer.SetHasher(hasher)
 
 				// Create the first list of hash strings
@@ -196,7 +197,7 @@ var _ = Describe("Chunk", func() {
 				// Reverse the data list and create second hasher
 				reverse(cases)
 				hasher, err = CreateHasher(name)
-				Ω(err).Should(BeNil())
+				Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 				signer.SetHasher(hasher)
 
 				bravo := make([]string, len(cases))
@@ -224,31 +225,31 @@ var _ = Describe("Chunk", func() {
 
 		BeforeEach(func() {
 			tmpDir, err = ioutil.TempDir("", TempDirPrefix)
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 		})
 
 		AfterEach(func() {
 			err = os.RemoveAll(tmpDir)
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 		})
 
 		It("should compute a path based on the hash", func() {
 			blob, err := MakeBlob([]byte("I shot the elephant in my pajamas"), SHA256)
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 			Ω(blob.Hash()).Should(Equal("7rYjqdSaixrocwtlp86HAEYTMfPS71tObgYGVtR-SUI"))
 			Ω(blob.Path()).Should(Equal("7rYjqdSa/ixrocwtl/p86HAEYT/MfPS71tO/bgYGVtR-/7rYjqdSaixrocwtlp86HAEYTMfPS71tObgYGVtR-SUI.blob"))
 		})
 
 		It("should compute the size of the data", func() {
 			blob, err := MakeBlob([]byte("I shot the elephant in my pajamas"), SHA256)
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 			Ω(blob.Size()).Should(Equal(33))
 		})
 
 		It("should return data unmodified", func() {
 			data := []byte("I shot the elephant in my pajamas\nThey were a tight fit!")
 			blob, err := MakeBlob(data, SHA256)
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 			Ω(blob.Data()).Should(Equal(data))
 		})
 
@@ -260,11 +261,11 @@ var _ = Describe("Chunk", func() {
 
 			// Make the blob
 			blob, err := MakeBlob(data, SHA256)
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 
 			// Save the blob
 			err = blob.Save(tmpDir)
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 
 			// Ensure the file exists
 			info, err := os.Stat(path)
@@ -273,7 +274,7 @@ var _ = Describe("Chunk", func() {
 
 			// Read the file and make sure it contains exactly the data
 			fdata, err := ioutil.ReadFile(path)
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 			Ω(fdata).Should(Equal(data))
 
 		})
@@ -287,12 +288,12 @@ var _ = Describe("Chunk", func() {
 			// Write the data to disk.
 			os.MkdirAll(filepath.Dir(path), ModeStorageDir)
 			err := ioutil.WriteFile(path, data, ModeBlob)
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 
 			// Load the blob
 			blob := new(Blob)
 			err = blob.Load(path)
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 			Ω(blob).ShouldNot(BeZero())
 
 			// Check the data, size, path, and hash
@@ -310,12 +311,12 @@ var _ = Describe("Chunk", func() {
 			// Write the data to disk.
 			os.MkdirAll(filepath.Dir(path), ModeStorageDir)
 			err := ioutil.WriteFile(path, data, ModeBlob)
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 
 			// Load the blob
 			blob := new(Blob)
 			err = blob.Load(path)
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 			Ω(blob).ShouldNot(BeZero())
 
 			// Check the data, size, path, and hash
@@ -328,18 +329,18 @@ var _ = Describe("Chunk", func() {
 		It("should be able to save a blob then load it", func() {
 			data := []byte(randString(4096))
 			blob, err := MakeBlob(data, SHA256)
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 
 			// Save the blob
 			err = blob.Save(tmpDir)
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 
 			// Load the new blob
 			// NOTE: on save the blob path is stored with the temp directory
 			// TODO: is this a problem for serialization?
 			newBlob := new(Blob)
 			err = newBlob.Load(blob.Path())
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 
 			Ω(blob).Should(Equal(newBlob))
 		})
@@ -355,7 +356,7 @@ var _ = Describe("Chunk", func() {
 		BeforeEach(func() {
 
 			tmpDir, err = ioutil.TempDir("", TempDirPrefix)
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 
 			config = &StorageConfig{
 				Path:         tmpDir,
@@ -371,14 +372,14 @@ var _ = Describe("Chunk", func() {
 
 		AfterEach(func() {
 			err = os.RemoveAll(tmpDir)
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 		})
 
 		It("should create a FixedLengthChunker on demand", func() {
 
 			data := []byte(randString(512))
 			chunker, err := NewChunker(data, config)
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 
 			chunker, ok := chunker.(*FixedLengthChunker)
 			Ω(ok).Should(BeTrue())
@@ -390,7 +391,7 @@ var _ = Describe("Chunk", func() {
 		It("should create even length chunks", func() {
 			data := []byte(randString(2048))
 			chunker, err := NewChunker(data, config)
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 
 			chunks := make([]*Blob, 0, 4)
 
@@ -407,7 +408,7 @@ var _ = Describe("Chunk", func() {
 		It("should create a small last chunk bigger than the minimum", func() {
 			data := []byte(randString(2304))
 			chunker, err := NewChunker(data, config)
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 
 			chunks := make([]*Blob, 0, 5)
 
@@ -424,7 +425,7 @@ var _ = Describe("Chunk", func() {
 		It("should respect the minimum blob size", func() {
 			data := []byte(randString(2144))
 			chunker, err := NewChunker(data, config)
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 
 			chunks := make([]*Blob, 0, 4)
 
@@ -441,7 +442,7 @@ var _ = Describe("Chunk", func() {
 		It("should respect the exact minimum blob size", func() {
 			data := []byte(randString(2176))
 			chunker, err := NewChunker(data, config)
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 
 			chunks := make([]*Blob, 0, 5)
 
@@ -458,7 +459,7 @@ var _ = Describe("Chunk", func() {
 		It("should be able to chunk and recombine without errors", func() {
 			data := []byte(randString(2144))
 			chunker, err := NewChunker(data, config)
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 
 			chunks := make([]*Blob, 0, 4)
 
@@ -478,7 +479,7 @@ var _ = Describe("Chunk", func() {
 		It("should be able to chunk, save to disk, and read without errors", func() {
 			data := []byte(randString(2304))
 			chunker, err := NewChunker(data, config)
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 
 			paths := make([]string, 0, 5)
 
@@ -491,7 +492,7 @@ var _ = Describe("Chunk", func() {
 			fdata := make([]byte, 0, 2304)
 			for _, path := range paths {
 				rdata, err := ioutil.ReadFile(path)
-				Ω(err).Should(BeNil())
+				Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 				fdata = append(fdata, rdata...)
 			}
 
@@ -502,7 +503,7 @@ var _ = Describe("Chunk", func() {
 		It("should be able to chunk foo.txt with default block sizes", func() {
 			fixture := filepath.Join("testdata", "foo.txt")
 			data, err := ioutil.ReadFile(fixture)
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 
 			config := new(StorageConfig)
 			config.Defaults()
@@ -511,7 +512,7 @@ var _ = Describe("Chunk", func() {
 			Ω(config.Validate()).Should(BeNil())
 
 			chunker, err := NewChunker(data, config)
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 
 			sizes := make([]int, 0, 10)
 
@@ -534,7 +535,7 @@ var _ = Describe("Chunk", func() {
 		It("should be able to iterate through chunks multiple times (call reset)", func() {
 			data := []byte(randString(3264))
 			chunker, err := NewChunker(data, config)
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 
 			alpha := make([]*Blob, 0, 8)
 			bravo := make([]*Blob, 0, 8)
@@ -563,7 +564,7 @@ var _ = Describe("Chunk", func() {
 		BeforeEach(func() {
 
 			tmpDir, err = ioutil.TempDir("", TempDirPrefix)
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 
 			config = new(StorageConfig)
 			config.Defaults()
@@ -575,7 +576,7 @@ var _ = Describe("Chunk", func() {
 		It("should create a RabinKarpChunker on demand", func() {
 			data := []byte(randString(512))
 			chunker, err := NewChunker(data, config)
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 
 			chunker, ok := chunker.(*RabinKarpChunker)
 			Ω(ok).Should(BeTrue())
@@ -587,7 +588,7 @@ var _ = Describe("Chunk", func() {
 		It("should create variable length blobs", func() {
 			data := []byte(randString(87542))
 			chunker, err := NewChunker(data, config)
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 
 			sizes := make([]int, 0, 11)
 
@@ -629,10 +630,10 @@ var _ = Describe("Chunk", func() {
 			expected := []int{8118, 3638, 3286, 2479, 8192, 2841, 2705, 5685, 5119}
 
 			data, err := ioutil.ReadFile(fixture)
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 
 			chunker, err := NewChunker(data, config)
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 
 			sizes := make([]int, 0, 9)
 			for chunker.Next() {
@@ -646,7 +647,7 @@ var _ = Describe("Chunk", func() {
 		It("should be able to iterate through chunks multiple times (call reset)", func() {
 			data := []byte(randString(32640))
 			chunker, err := NewChunker(data, config)
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 
 			alpha := make([]*Blob, 0, 5)
 			bravo := make([]*Blob, 0, 5)
@@ -669,7 +670,7 @@ var _ = Describe("Chunk", func() {
 		It("should be able to chunk and recombine without errors", func() {
 			data := []byte(randString(96524))
 			chunker, err := NewChunker(data, config)
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 
 			chunks := make([]*Blob, 0, 4)
 
@@ -689,7 +690,7 @@ var _ = Describe("Chunk", func() {
 		It("should be able to chunk, save to disk, and read without errors", func() {
 			data := []byte(randString(1120304))
 			chunker, err := NewChunker(data, config)
-			Ω(err).Should(BeNil())
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 
 			paths := make([]string, 0, 5)
 
@@ -702,7 +703,7 @@ var _ = Describe("Chunk", func() {
 			fdata := make([]byte, 0, 2304)
 			for _, path := range paths {
 				rdata, err := ioutil.ReadFile(path)
-				Ω(err).Should(BeNil())
+				Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 				fdata = append(fdata, rdata...)
 			}
 
