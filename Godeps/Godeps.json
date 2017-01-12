@@ -20,6 +20,11 @@
 			"Rev": "d9eb7a3d35ec988b8585d4a0068e462c27d28380"
 		},
 		{
+			"ImportPath": "github.com/google/uuid",
+			"Comment": "v.1-22-g064e206",
+			"Rev": "064e2069ce9c359c118179501254f67d7d37ba24"
+		},
+		{
 			"ImportPath": "github.com/gorilla/mux",
 			"Comment": "v1.1-27-g757bef9",
 			"Rev": "757bef944d0f21880861c2dd9c871ca543023cba"
