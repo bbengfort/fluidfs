@@ -63,6 +63,7 @@ var _ = Describe("Config", func() {
 			Ω(config.Name).Should(BeZero())
 			Ω(config.Host).Should(BeZero())
 			Ω(config.Port).Should(BeZero())
+			Ω(config.FStab).Should(BeZero())
 			Ω(config.Logging).Should(BeZero())
 			Ω(config.Database).Should(BeZero())
 			Ω(config.Storage).Should(BeZero())
@@ -71,11 +72,12 @@ var _ = Describe("Config", func() {
 			err := config.Defaults()
 			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 
-			Ω(config.Name).ShouldNot(BeZero())
-			Ω(config.Port).ShouldNot(BeZero())
-			Ω(config.Logging).ShouldNot(BeZero())
-			Ω(config.Database).ShouldNot(BeZero())
-			Ω(config.Storage).ShouldNot(BeZero())
+			Ω(config.Name).ShouldNot(BeZero(), "no name default")
+			Ω(config.Port).ShouldNot(BeZero(), "no port default")
+			Ω(config.FStab).ShouldNot(BeZero(), "no fstab default")
+			Ω(config.Logging).ShouldNot(BeZero(), "logging not defaulted")
+			Ω(config.Database).ShouldNot(BeZero(), "database not defaulted")
+			Ω(config.Storage).ShouldNot(BeZero(), "storage not defaulted")
 		})
 
 		Context("validation after defaults", func() {
@@ -90,14 +92,22 @@ var _ = Describe("Config", func() {
 			It("should not allow a zero pid value", func() {
 				config.PID = 0
 				err := config.Validate()
-				Ω(err).ShouldNot(BeNil())
+				Ω(err).Should(MatchError("Improperly configured: no precedence ID (pid) set."))
 			})
 
 			It("should not allow a null hostname", func() {
 				config.PID = 1
 				config.Name = ""
 				err := config.Validate()
-				Ω(err).ShouldNot(BeNil())
+				Ω(err).Should(MatchError("Improperly configured: a name is required."))
+			})
+
+			It("should not allow a null fstab", func() {
+				config.PID = 1
+				config.Name = "alaska"
+				config.FStab = ""
+				err := config.Validate()
+				Ω(err).Should(MatchError("Improperly configured: an fstab path is required."))
 			})
 
 			It("should validate the logging configuration", func() {
@@ -105,7 +115,7 @@ var _ = Describe("Config", func() {
 				config.Name = "alaska"
 				config.Logging.Level = "KLONDIKE"
 				err := config.Validate()
-				Ω(err).ShouldNot(BeNil())
+				Ω(err).Should(HaveOccurred())
 			})
 
 			It("should validate the database configuration", func() {
@@ -113,7 +123,7 @@ var _ = Describe("Config", func() {
 				config.Name = "alaska"
 				config.Database.Driver = "JunoDB"
 				err := config.Validate()
-				Ω(err).ShouldNot(BeNil())
+				Ω(err).Should(HaveOccurred())
 			})
 
 			It("should validate the chunking configuration", func() {
@@ -121,7 +131,7 @@ var _ = Describe("Config", func() {
 				config.Name = "alaska"
 				config.Storage.Chunking = "cloudy"
 				err := config.Validate()
-				Ω(err).ShouldNot(BeNil())
+				Ω(err).Should(HaveOccurred())
 			})
 
 		})
@@ -154,7 +164,7 @@ var _ = Describe("Config", func() {
 			It("should not allow bad logging levels", func() {
 				config.Level = "KODIAC"
 				err := config.Validate()
-				Ω(err).ShouldNot(BeNil())
+				Ω(err).Should(MatchError("Improperly Configured: 'KODIAC' is not a valid log level."))
 			})
 
 			It("should allow good logging levels", func() {
@@ -201,7 +211,7 @@ var _ = Describe("Config", func() {
 			It("should not allow bad database drivers", func() {
 				config.Driver = "KODIAC"
 				err := config.Validate()
-				Ω(err).ShouldNot(BeNil())
+				Ω(err).Should(MatchError("Improperly configured: 'kodiac' is not a valid database driver"))
 			})
 
 			It("should allow good database drivers", func() {
@@ -243,7 +253,7 @@ var _ = Describe("Config", func() {
 
 			It("should not allow zero database paths", func() {
 				config.Path = ""
-				Ω(config.Validate()).ShouldNot(BeNil())
+				Ω(config.Validate()).Should(MatchError("Improperly configured: must specify a path to the database"))
 			})
 
 		})
@@ -292,7 +302,7 @@ var _ = Describe("Config", func() {
 
 			It("should not allow zero storage paths", func() {
 				config.Path = ""
-				Ω(config.Validate()).ShouldNot(BeNil())
+				Ω(config.Validate()).Should(MatchError("Improperly configured: a path to the storage directory is required."))
 			})
 
 			It("should create the storage directory immediately", func() {
@@ -302,7 +312,7 @@ var _ = Describe("Config", func() {
 
 				config.Path = path
 
-				Ω(config.Validate()).Should(BeNil(), "error occurred during validation and should not have")
+				Ω(config.Validate()).ShouldNot(HaveOccurred(), "error occurred during validation and should not have")
 
 				info, err := os.Stat(path)
 				Ω(os.IsNotExist(err)).Should(BeFalse(), "path does not exist after validation!")
@@ -312,7 +322,7 @@ var _ = Describe("Config", func() {
 			It("should not allow bad chunking mechanisms", func() {
 				config.Chunking = "cloudy"
 				err := config.Validate()
-				Ω(err).ShouldNot(BeNil())
+				Ω(err).Should(MatchError("Improperly configured: 'cloudy' is not a valid chunking mechanism"))
 			})
 
 			It("should allow good chunking mechanisms", func() {
@@ -356,7 +366,7 @@ var _ = Describe("Config", func() {
 				config.MinBlockSize = 0
 				config.BlockSize = 0
 				err := config.Validate()
-				Ω(err).ShouldNot(BeNil())
+				Ω(err).Should(MatchError("Improperly configured: must specify a block size greater than 0 bytes."))
 
 				config.MinBlockSize = 10
 				config.BlockSize = 10
@@ -366,14 +376,14 @@ var _ = Describe("Config", func() {
 				config.MinBlockSize = -1
 				config.BlockSize = -1
 				err = config.Validate()
-				Ω(err).ShouldNot(BeNil())
+				Ω(err).Should(MatchError("Improperly configured: must specify a block size greater than 0 bytes."))
 			})
 
 			It("should not allow maximum block sizes less than the target", func() {
 				config.MaxBlockSize = 10
 				config.BlockSize = 1000
 				err := config.Validate()
-				Ω(err).ShouldNot(BeNil())
+				Ω(err).Should(MatchError("Improperly configured: maximum block size must be greater than or equal target and minimum block sizes."))
 
 			})
 
@@ -382,7 +392,7 @@ var _ = Describe("Config", func() {
 				config.MinBlockSize = 1000
 				config.BlockSize = 2000
 				err := config.Validate()
-				Ω(err).ShouldNot(BeNil())
+				Ω(err).Should(MatchError("Improperly configured: maximum block size must be greater than or equal target and minimum block sizes."))
 
 			})
 
@@ -390,14 +400,14 @@ var _ = Describe("Config", func() {
 				config.MinBlockSize = 1000
 				config.BlockSize = 100
 				err := config.Validate()
-				Ω(err).ShouldNot(BeNil())
+				Ω(err).Should(MatchError("Improperly configured: minimum block size must be less than or equal to the target block size."))
 
 			})
 
 			It("should not allow bad hashing alogrithms", func() {
 				config.Hashing = "protobob"
 				err := config.Validate()
-				Ω(err).ShouldNot(BeNil())
+				Ω(err).Should(MatchError("Improperly configured: 'protobob' is not a valid hashing algorithm"))
 			})
 
 			It("should allow good hashing alogrithms", func() {

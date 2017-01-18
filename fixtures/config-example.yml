@@ -25,6 +25,11 @@ pid: 0
 # The port to listen on, the default port is 4157.
 port: 4157
 
+# The path to the fstab file that configures mount points. If null or omitted,
+# the fstab file will be created at ~/.fluid/fstab. The fstab file can be
+# modified by both the application and the user, but with care.
+# fstab: null
+
 # Configuration for application logging
 logging:
 

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
@@ -60,7 +61,32 @@ func (c *CLIClient) Status() error {
 
 	status := res["status"].(string)
 	timestamp := res["timestamp"].(string)
-	fmt.Printf("FluidFS Status: %s at %s\n", status, timestamp)
+	mounts := res["mounts"].(string)
+	fmt.Printf("FluidFS Status: %s at %s\n%s\n", status, timestamp, mounts)
+	return nil
+}
+
+// Mount adds a new mount point to the FluidFS Server.
+// Right now this doesn't allow very much flexibility, you can only create a
+// mount with the specified path and prefix, the UID and GID is set from the
+// user that calls the command, a UUID is generated, and all other options are
+// set to reasonable defaults.
+// TODO: add mount and umount commands, see #39
+// TODO: unhack this!
+func (c *CLIClient) Mount(path string, prefix string) error {
+	data := make(JSON)
+	data["path"] = path
+	data["prefix"] = prefix
+	data["uid"] = os.Geteuid()
+	data["gid"] = os.Getegid()
+
+	res, err := c.Post(MountEndpoint, data)
+	if err != nil {
+		return fmt.Errorf("could not post request to fluidfs: %s", err.Error())
+	}
+
+	mp := res["mount"].(string)
+	fmt.Printf("created mount point for fluid://%s at %s:\n%s\n", prefix, path, mp)
 	return nil
 }
 
@@ -152,6 +178,16 @@ func (c *CLIClient) Get(resource string, detail ...string) (JSON, error) {
 		return nil, err
 	}
 
+	// Check if an error has occurred
+	if res.StatusCode != http.StatusOK {
+		msg, ok := data["error"].(string)
+		if ok {
+			return data, errors.New(msg)
+		}
+
+		return data, errors.New(res.Status)
+	}
+
 	return data, nil
 }
 
@@ -187,6 +223,16 @@ func (c *CLIClient) Post(resource string, data JSON, detail ...string) (JSON, er
 	var resData JSON
 	if err := json.NewDecoder(res.Body).Decode(&resData); err != nil {
 		return nil, err
+	}
+
+	// Check if an error has occurred
+	if res.StatusCode != http.StatusOK {
+		msg, ok := resData["error"].(string)
+		if ok {
+			return resData, errors.New(msg)
+		}
+
+		return resData, errors.New(res.Status)
 	}
 
 	return resData, nil

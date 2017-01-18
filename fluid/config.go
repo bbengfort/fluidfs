@@ -40,14 +40,15 @@ type Configuration interface {
 // from YAML configuration files and supplies the primary inputs to the
 // FluidFS server as well as connection interfaces to clients.
 type Config struct {
-	PID      int             `yaml:"pid"`            // Used to determine replica presidence
-	Name     string          `yaml:"name,omitempty"` // The name of the replica
-	Host     string          `yaml:"host,omitempty"` // The listen address or host the replica
-	Port     int             `yaml:"port,omitempty"` //  The port the replica listens on
-	Logging  *LoggingConfig  `yaml:"logging"`        // Configuration for logging
-	Database *DatabaseConfig `yaml:"database"`       // Database configuration
-	Storage  *StorageConfig  `yaml:"storage"`        // Storage/Chunking configuration
-	Loaded   []string        `yaml:"-"`              // Reference to the loaded configuration paths
+	PID      int             `yaml:"pid"`             // Used to determine replica presidence
+	Name     string          `yaml:"name,omitempty"`  // The name of the replica
+	Host     string          `yaml:"host,omitempty"`  // The listen address or host the replica
+	Port     int             `yaml:"port,omitempty"`  //  The port the replica listens on
+	FStab    string          `yaml:"fstab,omitempty"` // The path to the fstab file on disk
+	Logging  *LoggingConfig  `yaml:"logging"`         // Configuration for logging
+	Database *DatabaseConfig `yaml:"database"`        // Database configuration
+	Storage  *StorageConfig  `yaml:"storage"`         // Storage/Chunking configuration
+	Loaded   []string        `yaml:"-"`               // Reference to the loaded configuration paths
 }
 
 //===========================================================================
@@ -164,6 +165,12 @@ func (conf *Config) Defaults() error {
 	// Set the default Port
 	conf.Port = DefaultPort
 
+	// The default fstab path is in the user's hidden config directory: ~/.fluid/fstab
+	usr, err := user.Current()
+	if err == nil {
+		conf.FStab = filepath.Join(usr.HomeDir, HiddenConfigDirectory, "fstab")
+	}
+
 	// Create the logging configuration and call its defaults.
 	conf.Logging = new(LoggingConfig)
 	conf.Logging.Defaults()
@@ -190,6 +197,11 @@ func (conf *Config) Validate() error {
 	// Return an error if there is no replica name
 	if conf.Name == "" {
 		return errors.New("Improperly configured: a name is required.")
+	}
+
+	// Return an error if there is no fstab path
+	if conf.FStab == "" {
+		return errors.New("Improperly configured: an fstab path is required.")
 	}
 
 	// Validate the LoggingConfig

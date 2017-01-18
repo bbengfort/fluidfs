@@ -17,6 +17,7 @@ import "fmt"
 type Server struct {
 	PID    *PID     // Process ID and C&C information
 	Config *Config  // The application configuration
+	FS     *FSTable // Mount Points and FS handling
 	Logger *Logger  // Application logging and reporting
 	DB     Database // A connection to the database
 	Web    *C2SAPI  // The listener for command and control.
@@ -48,6 +49,12 @@ func (s *Server) Init(conf string) error {
 	// Log the initialization from the loaded configurations.
 	for _, path := range s.Config.Loaded {
 		s.Logger.Info("loaded configuration from %s", path)
+	}
+
+	// Initialize the FSTable from the fstab path
+	s.FS = new(FSTable)
+	if err = s.FS.Load(s.Config.FStab); err != nil {
+		return err
 	}
 
 	// Initialize the C2S API

@@ -6,10 +6,17 @@ package fluid
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"io/ioutil"
 	"net/http"
+	"os"
 	"strconv"
+	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 )
 
@@ -39,6 +46,7 @@ const (
 const (
 	RootEndpoint   = "/"
 	StatusEndpoint = "/status"
+	MountEndpoint  = "/mounts"
 )
 
 //===========================================================================
@@ -60,6 +68,7 @@ func (api *C2SAPI) Init(fluid *Server) error {
 
 	// Add handlers and routes
 	api.AddHandler(StatusEndpoint, api.StatusHandler)
+	api.AddHandler(MountEndpoint, api.MountHandler)
 
 	// Add the static files service from the binary assets
 	api.Router.Handle(RootEndpoint, WebLogger(api.Fluid.Logger, http.FileServer(assetFS())))
@@ -126,6 +135,107 @@ func (api *C2SAPI) AddHandler(path string, inner APIHandler) {
 func (api *C2SAPI) StatusHandler(r *http.Request) (int, JSON, error) {
 	data := make(JSON)
 	data["status"] = "ok"
-	data["timestamp"] = time.Now().String()
+	data["timestamp"] = time.Now().Format(JSONDateTime)
+	data["mounts"] = api.Fluid.FS.Status()
 	return http.StatusOK, data, nil
+}
+
+// MountHandler accepts POST data for the mount command and creates a new
+// MountPoint, then saves the fstable to disk, returning success or error.
+// TODO: Make this a fully formed RESTful API. See #39
+// TODO: Unhack this!
+func (api *C2SAPI) MountHandler(r *http.Request) (int, JSON, error) {
+	// Parse the JSON data from the request
+	req, err := readRequestJSON(r)
+	if err != nil {
+		return http.StatusInternalServerError, nil, err
+	}
+
+	var (
+		path   string
+		prefix string
+		uid    float64
+		gid    float64
+		ok     bool
+	)
+	fmt.Println(req)
+
+	// Validate the passed in arguments
+	if path, ok = req["path"].(string); !ok {
+		return http.StatusBadRequest, nil, errors.New("missing required path argument")
+	}
+
+	if prefix, ok = req["prefix"].(string); !ok {
+		return http.StatusBadRequest, nil, errors.New("missing required prefix argument")
+	}
+
+	if uid, ok = req["uid"].(float64); !ok {
+		return http.StatusBadRequest, nil, errors.New("missing required uid argument")
+	}
+
+	if gid, ok = req["gid"].(float64); !ok {
+		return http.StatusBadRequest, nil, errors.New("missing required gid argument")
+	}
+
+	info, err := os.Stat(path)
+	if os.IsNotExist(err) {
+		return http.StatusBadRequest, nil, fmt.Errorf("mount path '%s' does not exist", path)
+	}
+
+	if !info.IsDir() {
+		return http.StatusBadRequest, nil, fmt.Errorf("mount path '%s' is not a directory", path)
+	}
+
+	if strings.HasPrefix(prefix, "/") {
+		return http.StatusBadRequest, nil, errors.New("prefix cannot start with '/'")
+	}
+
+	// Create the mount point now that we've validated it (more or less)
+	mp := &MountPoint{
+		UUID:      uuid.New(),
+		Path:      path,
+		Prefix:    prefix,
+		UID:       int(uid),
+		GID:       int(gid),
+		Store:     true,
+		Replicate: true,
+		Comments:  make([]string, 0, 0),
+		Options:   []string{"defaults"},
+	}
+
+	// Add the mount point to the fs table.
+	if err := api.Fluid.FS.AddMountPoint(mp); err != nil {
+		return http.StatusInternalServerError, nil, err
+	}
+
+	// Return the response with the created mount point
+	data := make(JSON)
+	data["mount"] = mp.String()
+	return http.StatusOK, data, nil
+}
+
+//===========================================================================
+// Helper functions
+//===========================================================================
+
+// Helper function to decode the JSON in an HTTP Request
+func readRequestJSON(r *http.Request) (JSON, error) {
+	// Read the data from the request stream (limit the size to 100 MB)
+	body, err := ioutil.ReadAll(io.LimitReader(r.Body, 104857600))
+	if err != nil {
+		return nil, err
+	}
+
+	// Attempt to close the body of the request for reading
+	if err := r.Body.Close(); err != nil {
+		return nil, err
+	}
+
+	// Unmarshall the JSON data into a JSON data structure
+	var data JSON
+	if err := json.Unmarshal(body, &data); err != nil {
+		return nil, err
+	}
+
+	return data, nil
 }

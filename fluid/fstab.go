@@ -202,6 +202,43 @@ func (fstab *FSTable) Save(path string) error {
 	return ioutil.WriteFile(path, []byte(output), ModeBlob)
 }
 
+// AddMountPoint attempts to add, save, and mount a MountPoint to the file
+// system table. This may require a consensus decision or other communication
+// and may return an error. All MountPoints shoudl be added through this
+// method.
+func (fstab *FSTable) AddMountPoint(mp *MountPoint) error {
+	// Verify MountPoint uniqueness
+	for _, cmp := range fstab.Mounts {
+		if mp.UUID == cmp.UUID {
+			return fmt.Errorf("mount point with uuid '%s' already exists", cmp.UUID.String())
+		}
+
+		if mp.Path == cmp.Path {
+			return fmt.Errorf("mount point with path '%s' already exists", cmp.Path)
+		}
+
+		if mp.Prefix == cmp.Prefix {
+			return fmt.Errorf("mount point with prefix '%s' already exists", cmp.Prefix)
+		}
+	}
+
+	// Append the mount point to the mounts list.
+	fstab.Mounts = append(fstab.Mounts, mp)
+
+	// Save the fstab file to disk
+	if err := fstab.Save(""); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Status returns a string that updates the user about the current status of
+// FSTable mount points, indicating number and health.
+func (fstab *FSTable) Status() string {
+	return fmt.Sprintf("fs has %d mount points", len(fstab.Mounts))
+}
+
 //===========================================================================
 // MountPoint Methods
 //===========================================================================
@@ -259,6 +296,10 @@ func (mp *MountPoint) Parse(line string) error {
 // line definition for the fstab file. It is used to write the mount point to
 // the fstab file when the FSTable is saved.
 func (mp *MountPoint) String() string {
+	if mp.Options == nil || len(mp.Options) == 0 {
+		mp.Options = []string{"defaults"}
+	}
+
 	fields := []string{
 		mp.UUID.String(),
 		mp.Path,
