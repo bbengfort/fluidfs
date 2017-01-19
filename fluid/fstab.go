@@ -16,6 +16,8 @@ import (
 	"strings"
 	"time"
 
+	"bazil.org/fuse"
+
 	"github.com/google/uuid"
 )
 
@@ -80,6 +82,158 @@ type FSTable struct {
 	Mounts  []*MountPoint // A list of the mount points in the fstab
 	Path    string        // The path on disk where the fstab is stored
 	Updated time.Time     // The timestamp of the last update to the fstab
+}
+
+// FuseFSTable maintains information about all MountPoints in the system by
+// managing the fstab file as FSTable does, but it also manages FileSystem
+// objects that mount and serve the MountPoints for FUSE interaction. The
+// FuseFSTable provides methods for running and stopping all mounted
+// FileSystem objects and is primarily used by FluidFS
+type FuseFSTable struct {
+	FSTable
+	FuseFS []*FileSystem // A list of connected fuse.FS interface objects
+}
+
+//===========================================================================
+// MountPoint Methods
+//===========================================================================
+
+// Parse a mount point definition line from an fstab file. Currently the line
+// format respects white space delimiters (tab, space, and multi-space):
+//
+//     [UUID] [Mount Point] [Prefix] [UID] [GID] [Options] [Store] [Replicate]
+//
+// This populates the mount point object and will overwrite any data already
+// stored in the object. The FSTable object passes lines from the fstab file
+// to mount point objects in order to instantiate them.
+func (mp *MountPoint) Parse(line string) error {
+	var err error
+	fields := strings.Fields(line)
+
+	if len(fields) != 8 {
+		return errors.New("could not parse mount point: not enough fields")
+	}
+
+	// Parse the UUID
+	if mp.UUID, err = uuid.Parse(fields[0]); err != nil {
+		return fmt.Errorf("could not parse UUID field: %s", err.Error())
+	}
+
+	// Set the mount point path and prefix strings
+	mp.Path = fields[1]
+	mp.Prefix = fields[2]
+
+	// Parse the UID and GID integers
+	if mp.UID, err = strconv.Atoi(fields[3]); err != nil {
+		return fmt.Errorf("could not parse UID field: %s", err.Error())
+	}
+
+	if mp.GID, err = strconv.Atoi(fields[4]); err != nil {
+		return fmt.Errorf("could not parse GID field: %s", err.Error())
+	}
+
+	// Split the options on comma and store.
+	opts := strings.ToLower(fields[5])
+	mp.Options = strings.Split(opts, ",")
+
+	// Parse the Store and Replicate Boolean values
+	if mp.Store, err = strconv.ParseBool(fields[6]); err != nil {
+		return fmt.Errorf("could not parse Store field: %s", err.Error())
+	}
+
+	if mp.Replicate, err = strconv.ParseBool(fields[7]); err != nil {
+		return fmt.Errorf("could not parse Replicate field: %s", err.Error())
+	}
+
+	return nil
+}
+
+// String returns a string representation of the MountPoint as defined by the
+// line definition for the fstab file. It is used to write the mount point to
+// the fstab file when the FSTable is saved.
+func (mp *MountPoint) String() string {
+	// Update the mount options if they don't exist.
+	if mp.Options == nil || len(mp.Options) == 0 {
+		mp.Options = []string{"defaults"}
+	}
+
+	fields := []string{
+		mp.UUID.String(),
+		mp.Path,
+		mp.Prefix,
+		strconv.Itoa(mp.UID),
+		strconv.Itoa(mp.GID),
+		strings.Join(mp.Options, ","),
+		strconv.FormatBool(mp.Store),
+		strconv.FormatBool(mp.Replicate),
+	}
+
+	return strings.Join(fields, " ")
+}
+
+// MountOptions constructs a list of FUSE MountOption flags based on the
+// Options loaded from the mount point string. The currently specified mount
+// options are as follows (also called "defaults"):
+//
+//     - fuse.FSName("fluidfs")
+//     - fuse.Subtype("fluidfs")
+//     - fuse.LocalVolume()
+//     - fuse.VolumeName(mp.Prefix)
+//
+// If the following keys are in mp.Options:
+//
+//     - "remote": fuse.LocalVolume() will be removed.
+//     - "readonly": fuse.ReadOnly() will be added.
+//     - "noapple": fuse.NoAppleDouble() and fuse.NoAppleXattr() will be added.
+//     - "nonempty": fuse.AllowNonEmptyMount() will be added.
+//     - "dev": fuse.AllowDev() will be added.
+//
+// For more about what these options do see:
+// https://godoc.org/bazil.org/fuse#MountOption
+func (mp *MountPoint) MountOptions() []fuse.MountOption {
+	// Get the default mount options.
+	defaults := DefaultMountOptions()
+	defaults["volume"] = fuse.VolumeName(mp.Prefix)
+
+	//  Update the mount options if they don't exist.
+	if mp.Options == nil || len(mp.Options) == 0 {
+		mp.Options = []string{"defaults"}
+	}
+
+	// If remote is in the options, delete the local
+	if ListContains("remote", mp.Options) {
+		delete(defaults, "local")
+	}
+
+	// If readonly is in the options add the read only mount
+	if ListContains("readonly", mp.Options) {
+		defaults["readonly"] = fuse.ReadOnly()
+	}
+
+	// If noapple is in the options remove the OS X specific arguments.
+	if ListContains("noapple", mp.Options) {
+		defaults["noappledouble"] = fuse.NoAppleDouble()
+		defaults["noapplexattr"] = fuse.NoAppleXattr()
+	}
+
+	// If nonempty is in the options, allow Non-Empty mount
+	if ListContains("nonempty", mp.Options) {
+		defaults["allownonempty"] = fuse.AllowNonEmptyMount()
+	}
+
+	// If dev is in the options, allow Dev mount
+	if ListContains("dev", mp.Options) {
+		defaults["dev"] = fuse.AllowDev()
+	}
+
+	// Get the fuse MountOption values from the defaults
+	opts := make([]fuse.MountOption, 0, len(defaults))
+	for _, val := range defaults {
+		opts = append(opts, val)
+	}
+
+	// Return the mount options
+	return opts
 }
 
 //===========================================================================
@@ -240,76 +394,39 @@ func (fstab *FSTable) Status() string {
 }
 
 //===========================================================================
-// MountPoint Methods
+// FuseFSTable Methods
 //===========================================================================
 
-// Parse a mount point definition line from an fstab file. Currently the line
-// format respects white space delimiters (tab, space, and multi-space):
-//
-//     [UUID] [Mount Point] [Prefix] [UID] [GID] [Options] [Store] [Replicate]
-//
-// This populates the mount point object and will overwrite any data already
-// stored in the object. The FSTable object passes lines from the fstab file
-// to mount point objects in order to instantiate them.
-func (mp *MountPoint) Parse(line string) error {
-	var err error
-	fields := strings.Fields(line)
+// Run a FileSystem on all MountPoints
+func (fs *FuseFSTable) Run(r *Replica, echan chan error) error {
+	// Make the FuseFS File system list
+	fs.FuseFS = make([]*FileSystem, len(fs.Mounts))
 
-	if len(fields) != 8 {
-		return errors.New("could not parse mount point: not enough fields")
-	}
+	for i, mp := range fs.Mounts {
+		// Create and add the fs to the file system list.
+		fs.FuseFS[i] = &FileSystem{MountPoint: mp}
 
-	// Parse the UUID
-	if mp.UUID, err = uuid.Parse(fields[0]); err != nil {
-		return fmt.Errorf("could not parse UUID field: %s", err.Error())
-	}
-
-	// Set the mount point path and prefix strings
-	mp.Path = fields[1]
-	mp.Prefix = fields[2]
-
-	// Parse the UID and GID integers
-	if mp.UID, err = strconv.Atoi(fields[3]); err != nil {
-		return fmt.Errorf("could not parse UID field: %s", err.Error())
-	}
-
-	if mp.GID, err = strconv.Atoi(fields[4]); err != nil {
-		return fmt.Errorf("could not parse GID field: %s", err.Error())
-	}
-
-	// Split the options on comma and store.
-	mp.Options = strings.Split(fields[5], ",")
-
-	// Parse the Store and Replicate Boolean values
-	if mp.Store, err = strconv.ParseBool(fields[6]); err != nil {
-		return fmt.Errorf("could not parse Store field: %s", err.Error())
-	}
-
-	if mp.Replicate, err = strconv.ParseBool(fields[7]); err != nil {
-		return fmt.Errorf("could not parse Replicate field: %s", err.Error())
+		// Mount and run the file system in a separate go routine
+		r.Logger.Info("mounting fluidfs://%s on %s", mp.Prefix, mp.Path)
+		go fs.FuseFS[i].Run(echan)
 	}
 
 	return nil
 }
 
-// String returns a string representation of the MountPoint as defined by the
-// line definition for the fstab file. It is used to write the mount point to
-// the fstab file when the FSTable is saved.
-func (mp *MountPoint) String() string {
-	if mp.Options == nil || len(mp.Options) == 0 {
-		mp.Options = []string{"defaults"}
+// Shutdown all FileSystem objects
+func (fs *FuseFSTable) Shutdown() error {
+	errs := make([]error, 0)
+	for _, fsc := range fs.FuseFS {
+		if err := fsc.Shutdown(); err != nil {
+			errs = append(errs, err)
+		}
 	}
 
-	fields := []string{
-		mp.UUID.String(),
-		mp.Path,
-		mp.Prefix,
-		strconv.Itoa(mp.UID),
-		strconv.Itoa(mp.GID),
-		strings.Join(mp.Options, ","),
-		strconv.FormatBool(mp.Store),
-		strconv.FormatBool(mp.Replicate),
+	if len(errs) > 0 {
+		return fmt.Errorf("could not shutdown %d of %d mounts", len(errs), len(fs.FuseFS))
 	}
 
-	return strings.Join(fields, " ")
+	fs.FuseFS = nil
+	return nil
 }

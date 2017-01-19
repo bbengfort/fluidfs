@@ -5,6 +5,7 @@ package fluid
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/boltdb/bolt"
 )
@@ -24,7 +25,7 @@ func (bdb *BoltDB) Init(path string) error {
 	var err error
 
 	// Open the bolt database
-	bdb.db, err = bolt.Open(path, 0644, nil)
+	bdb.db, err = bolt.Open(path, 0644, &bolt.Options{Timeout: 15 * time.Second})
 	if err != nil {
 		return err
 	}

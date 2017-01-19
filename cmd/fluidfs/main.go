@@ -9,7 +9,7 @@ import (
 	"github.com/urfave/cli"
 )
 
-var server *fluid.Server
+var replica *fluid.Replica
 
 func main() {
 
@@ -37,8 +37,8 @@ func main() {
 	app.Commands = []cli.Command{
 		{
 			Name:   "start",
-			Usage:  "start the fluidfs server",
-			Action: startServer,
+			Usage:  "start the fluidfs replica",
+			Action: startReplica,
 		},
 		{
 			Name:   "config",
@@ -52,16 +52,16 @@ func main() {
 }
 
 func initFluid(c *cli.Context) error {
-	server = new(fluid.Server)
-	if err := server.Init(c.String("config")); err != nil {
+	replica = new(fluid.Replica)
+	if err := replica.Init(c.String("config")); err != nil {
 		return cli.NewExitError(err.Error(), 1)
 	}
 
 	return nil
 }
 
-func startServer(c *cli.Context) error {
-	if err := server.Run(); err != nil {
+func startReplica(c *cli.Context) error {
+	if err := replica.Run(); err != nil {
 		return cli.NewExitError(err.Error(), 1)
 	}
 
@@ -70,5 +70,5 @@ func startServer(c *cli.Context) error {
 
 func printConfig(c *cli.Context) {
 	// Print the configuration and exit
-	fmt.Println(server.Config.String())
+	fmt.Println(replica.Config.String())
 }

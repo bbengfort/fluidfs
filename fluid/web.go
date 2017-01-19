@@ -57,11 +57,11 @@ const (
 // API that serves both a web interface and the command line client.
 type C2SAPI struct {
 	Router *mux.Router
-	Fluid  *Server
+	Fluid  *Replica
 }
 
 // Init the C2SAPI with a hook to the server that the API wraps.
-func (api *C2SAPI) Init(fluid *Server) error {
+func (api *C2SAPI) Init(fluid *Replica) error {
 	// Initialize the API
 	api.Fluid = fluid
 	api.Router = mux.NewRouter().StrictSlash(true)
@@ -78,7 +78,7 @@ func (api *C2SAPI) Init(fluid *Server) error {
 }
 
 // Run the API at the specified address.
-func (api *C2SAPI) Run(addr string) error {
+func (api *C2SAPI) Run(addr string, echan chan error) {
 
 	// Create the HTTP server
 	srv := &http.Server{
@@ -92,7 +92,9 @@ func (api *C2SAPI) Run(addr string) error {
 	api.Fluid.Logger.Info("starting C2S API and web interface at http://%s/", addr)
 
 	// Listen and Serve
-	return srv.ListenAndServe()
+	if err := srv.ListenAndServe(); err != nil {
+		echan <- fmt.Errorf("C2S API error: %s", err.Error())
+	}
 }
 
 // AddHandler adds the specified handler to the API.

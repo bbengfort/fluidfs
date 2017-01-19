@@ -6,118 +6,137 @@ package fluid
 import "fmt"
 
 //===========================================================================
-// FluidFS Server
+// FluidFS Replica
 //===========================================================================
 
-// Server represents the primary application object. All application
-// interactions must pass through an instance of the FluidServer.  On init
-// the FluidServer loads the configuration, instantiates logging and database
+// Replica represents the primary application object. All application
+// interactions must pass through an instance of the Fluid Replica.  On init
+// the Fluid Replica loads the configuration, instantiates logging and database
 // connections, then can be run in the background with various method calls
 // from external service requests or other environmental detection.
-type Server struct {
-	PID    *PID     // Process ID and C&C information
-	Config *Config  // The application configuration
-	FS     *FSTable // Mount Points and FS handling
-	Logger *Logger  // Application logging and reporting
-	DB     Database // A connection to the database
-	Web    *C2SAPI  // The listener for command and control.
+type Replica struct {
+	PID    *PID         // Process ID and C&C information
+	Config *Config      // The application configuration
+	FS     *FuseFSTable // Mount Points and FS handling
+	Logger *Logger      // Application logging and reporting
+	DB     Database     // A connection to the database
+	Web    *C2SAPI      // The listener for command and control.
 }
 
-// Init prepares the server for running by loading the configuration and
+// Init prepares the replica for running by loading the configuration and
 // setting up the logging handlers and other utilities. Note that this method
 // does not write a PID file or open connections to databases, these items are
-// handled when the Server is run, allowing non-destructive post-config tasks.
+// handled when the Replica is run, allowing non-destructive post-config tasks.
 //
 // Can optionally pass the path of a YAML configuration file on disk. Any
 // configurations in that file will superceede those in the etc directory or
 // in the user's home directory.
-func (s *Server) Init(conf string) error {
+func (r *Replica) Init(conf string) error {
 	var err error
 
 	// Load the configuration from YAML files on disk.
-	s.Config, err = LoadConfig(conf)
+	r.Config, err = LoadConfig(conf)
 	if err != nil {
 		return err
 	}
 
 	// Load the logger from the logging configuration.
-	s.Logger, err = InitLogger(s.Config.Logging)
+	r.Logger, err = InitLogger(r.Config.Logging)
 	if err != nil {
 		return err
 	}
 
 	// Log the initialization from the loaded configurations.
-	for _, path := range s.Config.Loaded {
-		s.Logger.Info("loaded configuration from %s", path)
+	for _, path := range r.Config.Loaded {
+		r.Logger.Info("loaded configuration from %s", path)
 	}
 
 	// Initialize the FSTable from the fstab path
-	s.FS = new(FSTable)
-	if err = s.FS.Load(s.Config.FStab); err != nil {
+	r.FS = new(FuseFSTable)
+	if err = r.FS.Load(r.Config.FStab); err != nil {
 		return err
 	}
 
 	// Initialize the C2S API
-	s.Web = new(C2SAPI)
-	if err = s.Web.Init(s); err != nil {
+	r.Web = new(C2SAPI)
+	if err = r.Web.Init(r); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-// Run the server by creating a PID file, listening for command and control,
+// Run the replica by creating a PID file, listening for command and control,
 // opening connections to databases, mounting the FUSE directories, and
 // listening for remote connections.
-func (s *Server) Run() error {
+func (r *Replica) Run() error {
 	var err error
 
 	// Handle any OS Signals
-	go signalHandler(s)
+	go signalHandler(r)
+
+	// Create X-Thread and X-Process Resources
 
 	// Create a PID file
-	s.PID = new(PID)
-	if err = s.PID.Save(); err != nil {
+	r.PID = new(PID)
+	if err = r.PID.Save(); err != nil {
 		return fmt.Errorf("could not write PID file: %s", err.Error())
 	}
 
 	// Log the creation of the PID file
-	s.Logger.Info("pid file created at %s", s.PID.Path())
+	r.Logger.Info("pid file created at %s", r.PID.Path())
 
 	// Open a connection to the database
-	s.DB, err = InitDatabase(s.Config.Database)
+	r.DB, err = InitDatabase(r.Config.Database)
 	if err != nil {
 		return fmt.Errorf("could not connect to database: %s", err.Error())
 	}
 
 	// Log the connection to the database
-	s.Logger.Info("connected to %s", s.Config.Database.String())
+	r.Logger.Info("connected to %s", r.Config.Database.String())
 
-	// Run the C2S API and web interface
-	// TODO: Run this in a go routine and not as the primary process
-	if err := s.Web.Run(s.PID.Addr()); err != nil {
-		return fmt.Errorf("could not run C2S API and web interface: %s", err.Error())
+	// Create the error channel for go routines
+	echan := make(chan error)
+
+	// Run services in independent go routines.
+
+	// Run the FUSE File Systems
+	if err = r.FS.Run(r, echan); err != nil {
+		return fmt.Errorf("could not run the FUSE file system: %s", err.Error())
 	}
 
-	return s.Shutdown()
+	// Run the C2S API and web interface
+	go r.Web.Run(r.PID.Addr(), echan)
+
+	// Listen for an error from any of the go routines (also blocks)
+	// Log the error and shutdown gracefully (returning only shutdown errors).
+	err = <-echan
+	r.Logger.Error(err.Error())
+	return r.Shutdown()
 }
 
-// Shutdown the server gracefully by unmounting FUSE directories, closing
+// Shutdown the replica gracefully by unmounting FUSE directories, closing
 // database connections, closing listeners for command and control, and
 // deleting the PID file, basically the reverse order of startup.
-func (s *Server) Shutdown() error {
-	s.Logger.Warn("starting shutdown process")
+func (r *Replica) Shutdown() error {
+	r.Logger.Warn("starting shutdown process")
+
+	// Close all the FUSE FS Connections
+	if err := r.FS.Shutdown(); err != nil {
+		r.Logger.Warn("could not shutdown FS: %s", err.Error())
+	}
 
 	// Close the Database
-	if err := s.DB.Close(); err != nil {
-		return err
+	if err := r.DB.Close(); err != nil {
+		r.Logger.Warn("could not shutdown database: %s", err.Error())
 	}
 
 	// Free the PID file
-	if err := s.PID.Free(); err != nil {
+	if err := r.PID.Free(); err != nil {
+		// If we can't free the PID file, then we have a problem.
 		return err
 	}
 
-	s.Logger.Info("fluidfs successfully shutdown")
+	r.Logger.Info("fluidfs successfully shutdown")
 	return nil
 }

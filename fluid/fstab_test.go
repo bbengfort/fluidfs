@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"bazil.org/fuse"
+
 	. "github.com/bbengfort/fluidfs/fluid"
 	"github.com/google/uuid"
 
@@ -70,7 +72,6 @@ var _ = Describe("fstab", func() {
 			// Attempt to parse the date as well
 			dtfmt := "Monday, 02 Jan 2006 at 15:04:05 -0700"
 			sub := re.FindStringSubmatch(line)
-			fmt.Println(sub)
 
 			date, err := time.Parse(dtfmt, strings.TrimSpace(sub[1]))
 			// time.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC)
@@ -240,6 +241,99 @@ var _ = Describe("fstab", func() {
 			err := mp.Parse(mps)
 			Ω(err).ShouldNot(HaveOccurred())
 			Ω(mp.String()).Should(Equal(mps))
+		})
+
+		Context("MountOptions", func() {
+
+			var mp *MountPoint
+			var defaults map[string]fuse.MountOption
+			var dopts []fuse.MountOption
+
+			BeforeEach(func() {
+				mp = &MountPoint{
+					UUID:      uuid.New(),
+					Path:      "/data/mnt/test",
+					Prefix:    "test",
+					UID:       501,
+					GID:       22,
+					Store:     true,
+					Replicate: true,
+					Comments:  make([]string, 0),
+					Options:   []string{"defaults"},
+				}
+
+				defaults = DefaultMountOptions()
+				dopts = make([]fuse.MountOption, 0, len(defaults))
+				for _, val := range defaults {
+					dopts = append(dopts, val)
+				}
+			})
+
+			AfterEach(func() {
+				mp = nil
+				dopts = nil
+			})
+
+			It("should return mount point defaults", func() {
+				// fuse.MountOption are functions so can't directly compare.
+				// Ensure it has the dopts + 1 (the Volume Name)
+				mopts := mp.MountOptions()
+				Ω(mopts).Should(HaveLen(len(dopts) + 1))
+			})
+
+			It("should implment the remote kw option", func() {
+				// Add the remote kw option to remove local
+				mp.Options = []string{"remote"}
+
+				// fuse.MountOption are functions so can't directly compare.
+				mopts := mp.MountOptions()
+				Ω(mopts).Should(HaveLen(len(dopts)))
+			})
+
+			It("should implment the readonly kw option", func() {
+				// Add the readonly kw option to add a MountOption
+				mp.Options = []string{"readonly"}
+
+				// fuse.MountOption are functions so can't directly compare.
+				mopts := mp.MountOptions()
+				Ω(mopts).Should(HaveLen(len(dopts) + 2))
+			})
+
+			It("should implment the noapple kw option", func() {
+				// Add the noapple kw option to add two MountOptions
+				mp.Options = []string{"noapple"}
+
+				// fuse.MountOption are functions so can't directly compare.
+				mopts := mp.MountOptions()
+				Ω(mopts).Should(HaveLen(len(dopts) + 3))
+			})
+
+			It("should implment the nonempty kw option", func() {
+				// Add the nonempty kw option to add a MountOption
+				mp.Options = []string{"nonempty"}
+
+				// fuse.MountOption are functions so can't directly compare.
+				mopts := mp.MountOptions()
+				Ω(mopts).Should(HaveLen(len(dopts) + 2))
+			})
+
+			It("should implment the dev kw option", func() {
+				// Add the dev kw option to add a MountOption
+				mp.Options = []string{"dev"}
+
+				// fuse.MountOption are functions so can't directly compare.
+				mopts := mp.MountOptions()
+				Ω(mopts).Should(HaveLen(len(dopts) + 2))
+			})
+
+			It("should be able to implement all kw options", func() {
+				// Add the dev kw option to add a MountOption
+				mp.Options = []string{"remote", "readonly", "noapple", "nonempty", "dev"}
+
+				// fuse.MountOption are functions so can't directly compare.
+				mopts := mp.MountOptions()
+				Ω(mopts).Should(HaveLen(len(dopts) + 5))
+			})
 		})
 
 	})

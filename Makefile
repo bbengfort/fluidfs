@@ -2,7 +2,7 @@
 SHELL := /bin/bash
 
 # Export targets not associated with files.
-.PHONY: all deps fmt test citest clean publish
+.PHONY: all deps fmt test citest clean publish doc
 
 # Build FlowFS to a local build directory.
 all: fmt deps
@@ -27,6 +27,11 @@ test:
 # Target for testing in continuous integration
 citest: 
 	ginkgo -r -v --randomizeAllSpecs --randomizeSuites --failOnPending --cover --trace --race --compilers=2
+
+# Run Godoc server and open browers 
+doc:
+	- open http://localhost:6060/pkg/github.com/bbengfort/fluidfs/fluid/
+	- godoc --http=:6060 
 
 # Clean build files
 clean:
