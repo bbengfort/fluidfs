@@ -11,6 +11,8 @@ import (
 	"os/user"
 	"path/filepath"
 
+	"github.com/bbengfort/fluidfs/fluid/db"
+
 	"gopkg.in/yaml.v2"
 )
 
@@ -313,7 +315,7 @@ type DatabaseConfig struct {
 func (conf *DatabaseConfig) Defaults() error {
 
 	// The default driver is the boltdb driver
-	conf.Driver = BoltDBDriver
+	conf.Driver = db.BoltDBDriver
 
 	// The default path to the database is in a hidden directory in the home
 	// directory of the user, namely ~/.fluidfs/cache.db
@@ -332,7 +334,7 @@ func (conf *DatabaseConfig) Validate() error {
 	conf.Driver = Regularize(conf.Driver)
 
 	// Ensure that the driver is in the list of drivers.
-	if !ListContains(conf.Driver, databaseDriverNames) {
+	if !ListContains(conf.Driver, db.DriverNames) {
 		return fmt.Errorf("Improperly configured: '%s' is not a valid database driver", conf.Driver)
 	}
 
@@ -352,6 +354,16 @@ func (conf *DatabaseConfig) Environ() error {
 // String returns a pretty representation of the database configuration.
 func (conf *DatabaseConfig) String() string {
 	return fmt.Sprintf("%s at %s", conf.Driver, conf.Path)
+}
+
+// GetDriver implements db.Config
+func (conf *DatabaseConfig) GetDriver() string {
+	return conf.Driver
+}
+
+// GetPath implements db.Config
+func (conf *DatabaseConfig) GetPath() string {
+	return conf.Path
 }
 
 //===========================================================================

@@ -7,6 +7,18 @@
 	],
 	"Deps": [
 		{
+			"ImportPath": "bazil.org/fuse",
+			"Rev": "371fbbdaa8987b715bdd21d6adc4c9b20155f748"
+		},
+		{
+			"ImportPath": "bazil.org/fuse/fs",
+			"Rev": "371fbbdaa8987b715bdd21d6adc4c9b20155f748"
+		},
+		{
+			"ImportPath": "bazil.org/fuse/fuseutil",
+			"Rev": "371fbbdaa8987b715bdd21d6adc4c9b20155f748"
+		},
+		{
 			"ImportPath": "github.com/boltdb/bolt",
 			"Comment": "v1.3.0-36-gd98e43f",
 			"Rev": "d98e43f69eae1c8e433703c587484b355d641e2d"
@@ -230,6 +242,10 @@
 			"ImportPath": "github.com/urfave/cli",
 			"Comment": "v1.19.1",
 			"Rev": "0bdeddeeb0f650497d603c4ad7b20cfe685682f6"
+		},
+		{
+			"ImportPath": "golang.org/x/net/context",
+			"Rev": "cfae461cedfdcab6e261a26eb77db53695623303"
 		},
 		{
 			"ImportPath": "golang.org/x/sys/unix",

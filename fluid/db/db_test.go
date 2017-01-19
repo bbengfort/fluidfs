@@ -1,4 +1,4 @@
-package fluid_test
+package db_test
 
 import (
 	"fmt"
@@ -6,7 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
-	. "github.com/bbengfort/fluidfs/fluid"
+	"github.com/bbengfort/fluidfs/fluid"
+	. "github.com/bbengfort/fluidfs/fluid/db"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -16,13 +17,13 @@ var _ = Describe("Database", func() {
 
 	var err error
 	var tmpDir string
-	var config *DatabaseConfig
+	var config *fluid.DatabaseConfig
 
 	BeforeEach(func() {
 		tmpDir, err = ioutil.TempDir("", TempDirPrefix)
 		Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 
-		config = new(DatabaseConfig)
+		config = new(fluid.DatabaseConfig)
 		config.Defaults()
 		config.Path = filepath.Join(tmpDir, "test.db")
 		Ω(config.Validate()).Should(BeNil())

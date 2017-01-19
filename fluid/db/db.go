@@ -1,6 +1,7 @@
-// Defines the interface for database interaction for our key/value store.
-
-package fluid
+// Package db defines a standard interface for interaction with the FluidFS
+// cache, implemented as an embedded key/value store. This package also
+// provides driver implementations for BoltDB and LevelDB.
+package db
 
 import "fmt"
 
@@ -17,8 +18,8 @@ const (
 	LevelDBDriver = "leveldb"
 )
 
-// Names of available drivers for validation
-var databaseDriverNames = []string{BoltDBDriver, LevelDBDriver}
+// DriverNames of available drivers for validation
+var DriverNames = []string{BoltDBDriver, LevelDBDriver}
 
 //===========================================================================
 // Database Interfaces
@@ -37,6 +38,13 @@ type Database interface {
 	Keys(bucket string) (*Cursor, error)                       // Returns all the keys for a bucket
 }
 
+// Config defines a methods that a struct should provide to be considered a
+// database configuration, and to pass options to initialization.
+type Config interface {
+	GetDriver() string // Return a string representing a driver
+	GetPath() string   // Return the path to the database on disk
+}
+
 // Cursor is an interator interface that enables iteration/search over
 // multiple key/value pairs with a single query.
 type Cursor interface {
@@ -50,20 +58,20 @@ type Cursor interface {
 
 // InitDatabase uses a database configuration object to select an appropriate
 // driver that implements the Database interface and initializes it.
-func InitDatabase(config *DatabaseConfig) (Database, error) {
+func InitDatabase(config Config) (Database, error) {
 
 	var db Database
 
-	switch config.Driver {
+	switch config.GetDriver() {
 	case BoltDBDriver:
 		db = new(BoltDB)
 	case LevelDBDriver:
 		db = new(LevelDB)
 	default:
-		return nil, fmt.Errorf("unknown database driver: '%s'", config.Driver)
+		return nil, fmt.Errorf("unknown database driver: '%s'", config.GetDriver())
 	}
 
 	// Initialize the Database
-	err := db.Init(config.Path)
+	err := db.Init(config.GetPath())
 	return db, err
 }

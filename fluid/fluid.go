@@ -3,7 +3,11 @@
 // the web interface, global configuration service and other data services.
 package fluid
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/bbengfort/fluidfs/fluid/db"
+)
 
 //===========================================================================
 // FluidFS Replica
@@ -19,7 +23,7 @@ type Replica struct {
 	Config *Config      // The application configuration
 	FS     *FuseFSTable // Mount Points and FS handling
 	Logger *Logger      // Application logging and reporting
-	DB     Database     // A connection to the database
+	DB     db.Database  // A connection to the database
 	Web    *C2SAPI      // The listener for command and control.
 }
 
@@ -87,7 +91,7 @@ func (r *Replica) Run() error {
 	r.Logger.Info("pid file created at %s", r.PID.Path())
 
 	// Open a connection to the database
-	r.DB, err = InitDatabase(r.Config.Database)
+	r.DB, err = db.InitDatabase(r.Config.Database)
 	if err != nil {
 		return fmt.Errorf("could not connect to database: %s", err.Error())
 	}

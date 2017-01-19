@@ -1,6 +1,6 @@
 // Implements the Database interface for BoltDB
 
-package fluid
+package db
 
 import (
 	"errors"

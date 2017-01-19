@@ -1,6 +1,6 @@
 // Implements the Database interface for LevelDB
 
-package fluid
+package db
 
 import (
 	"errors"
