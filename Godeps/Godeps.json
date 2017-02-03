@@ -19,6 +19,10 @@
 			"Rev": "371fbbdaa8987b715bdd21d6adc4c9b20155f748"
 		},
 		{
+			"ImportPath": "github.com/bbengfort/sequence",
+			"Rev": "080df07ce9822be9ec99c856f01c1ceafd5cfc5e"
+		},
+		{
 			"ImportPath": "github.com/boltdb/bolt",
 			"Comment": "v1.3.0-36-gd98e43f",
 			"Rev": "d98e43f69eae1c8e433703c587484b355d641e2d"
