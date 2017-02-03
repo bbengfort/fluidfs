@@ -147,7 +147,7 @@ func (c *CLIClient) Endpoint(resource string, detail ...string) *url.URL {
 func (c *CLIClient) Do(request *http.Request) (*http.Response, error) {
 	// Add the application version header and content type
 	request.Header.Set(HeaderAcceptKey, HeaderContentTypeVal)
-	request.Header.Set(HeaderVersionKey, fmt.Sprintf(HeaderVersionVal, Version()))
+	request.Header.Set(HeaderVersionKey, fmt.Sprintf(HeaderVersionVal, PackageVersion()))
 
 	// Execute the request
 	return c.client.Do(request)

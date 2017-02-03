@@ -73,3 +73,18 @@ func ListContains(value string, list []string) bool {
 	}
 	return false
 }
+
+//===========================================================================
+// Numeric Helpers
+//===========================================================================
+
+// MaxUInt64 returns the maximal value of the list of passed in uints
+func MaxUInt64(values ...uint64) uint64 {
+	max := uint64(0) // this works because values are unsigned.
+	for _, val := range values {
+		if val > max {
+			max = val
+		}
+	}
+	return max
+}

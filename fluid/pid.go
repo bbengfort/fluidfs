@@ -19,7 +19,7 @@ import (
 // OS Signal Handlers
 //===========================================================================
 
-func signalHandler(r *Replica) {
+func signalHandler() {
 	// Make signal channel and register notifiers for Interupt and Terminate
 	sigchan := make(chan os.Signal, 1)
 	signal.Notify(sigchan, os.Interrupt)
@@ -32,10 +32,10 @@ func signalHandler(r *Replica) {
 	defer os.Exit(0)
 
 	// Shutdown now that we've received the signal
-	err := r.Shutdown()
+	err := Shutdown()
 	if err != nil {
 		msg := fmt.Sprintf("shutdown error: %s", err.Error())
-		r.Logger.Fatal(msg)
+		logger.Fatal(msg)
 		os.Exit(1)
 	}
 }

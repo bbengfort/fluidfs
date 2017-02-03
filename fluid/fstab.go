@@ -398,16 +398,19 @@ func (fstab *FSTable) Status() string {
 //===========================================================================
 
 // Run a FileSystem on all MountPoints
-func (fs *FuseFSTable) Run(r *Replica, echan chan error) error {
+func (fs *FuseFSTable) Run(echan chan error) error {
 	// Make the FuseFS File system list
 	fs.FuseFS = make([]*FileSystem, len(fs.Mounts))
 
 	for i, mp := range fs.Mounts {
 		// Create and add the fs to the file system list.
-		fs.FuseFS[i] = &FileSystem{MountPoint: mp}
+		fs.FuseFS[i] = new(FileSystem)
+		if err := fs.FuseFS[i].Init(mp); err != nil {
+			return err
+		}
 
 		// Mount and run the file system in a separate go routine
-		r.Logger.Info("mounting fluidfs://%s on %s", mp.Prefix, mp.Path)
+		logger.Info("mounting fluidfs://%s on %s", mp.Prefix, mp.Path)
 		go fs.FuseFS[i].Run(echan)
 	}
 

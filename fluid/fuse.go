@@ -4,6 +4,9 @@ package fluid
 
 import (
 	"fmt"
+	"sync"
+
+	"github.com/bbengfort/sequence"
 
 	"bazil.org/fuse"
 	fusefs "bazil.org/fuse/fs"
@@ -25,13 +28,29 @@ func DefaultMountOptions() map[string]fuse.MountOption {
 }
 
 //===========================================================================
-// FileSystem implements the fuse.FS* interfaces
+// FileSystem Handling
 //===========================================================================
 
 // FileSystem implements the fuse.FS* interfaces.
 type FileSystem struct {
-	MountPoint *MountPoint // The location and options of this mount point
-	Conn       *fuse.Conn  // A connection to the FUSE server
+	sync.Mutex                    // A file system can be locked
+	Conn       *fuse.Conn         // A connection to the FUSE server
+	Sequence   *sequence.Sequence // iNode sequence object
+	root       *Dir               // The root of the file system
+	mount      *MountPoint        // The location and options of this mount point
+}
+
+// Init a file system with the replica server and the specified mount point.
+func (fs *FileSystem) Init(mp *MountPoint) error {
+
+	// Local storage of pointers to system resources
+	fs.mount = mp
+
+	// Fetch the root node from the database
+
+	// Handle the Sequence initialization
+
+	return nil
 }
 
 // Run connects to FUSE, mounts the mount point and Serves the FUSE FS.
@@ -43,7 +62,7 @@ func (fs *FileSystem) Run(echan chan error) {
 
 	// Mount the FS with the specified options.
 	if fs.Conn, err = fuse.Mount(
-		fs.MountPoint.Path, fs.MountPoint.MountOptions()...,
+		fs.mount.Path, fs.mount.MountOptions()...,
 	); err != nil {
 		echan <- fmt.Errorf("could not run FS: %s", err.Error())
 		return
@@ -77,14 +96,53 @@ func (fs *FileSystem) Shutdown() error {
 	// 	return err
 	// }
 
-	if err := fuse.Unmount(fs.MountPoint.Path); err != nil {
+	if err := fuse.Unmount(fs.mount.Path); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-// Root returns the root directory node.
+//===========================================================================
+// FileSystem implements the fuse.FS* interfaces
+//===========================================================================
+
+// Root is called to obtain the Node for the file system root.
 func (fs *FileSystem) Root() (fusefs.Node, error) {
 	return Dir{}, nil
 }
+
+// Destroy is called when the file system is shutting down.
+//
+// Linux only sends this request for block device backed (fuseblk)
+// filesystems, to allow them to flush writes to disk before the
+// unmount completes.
+// func (fs *FileSystem) Destroy() {
+// 	// No flush handling currently
+// }
+
+// GenerateInode is called to pick a dynamic inode number when it
+// would otherwise be 0.
+//
+// Not all filesystems bother tracking inodes, but FUSE requires
+// the inode to be set, and fewer duplicates in general makes UNIX
+// tools work better.
+//
+// Operations where the nodes may return 0 inodes include Getattr,
+// Setattr and ReadDir.
+//
+// If FS does not implement FSInodeGenerator, GenerateDynamicInode
+// is used.
+//
+// Implementing this is useful to e.g. constrain the range of
+// inode values used for dynamic inodes.
+// func (fs *FileSystem) GenerateInode(parentInode uint64, name string) uint64 {
+// 	// Just return the default mechanism for now.
+// 	return fusefs.GenerateDynamicInode(parentInode, name)
+// }
+
+// Statfs is called to obtain file system metadata.
+// It should write that data to resp.
+// func (fs *FileSystem) Statfs(ctx context.Context, req *fuse.StatfsRequest, resp *fuse.StatfsResponse) error {
+//     return nil
+// }

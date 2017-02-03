@@ -11,7 +11,7 @@ import (
 	"os/user"
 	"path/filepath"
 
-	"github.com/bbengfort/fluidfs/fluid/db"
+	kvdb "github.com/bbengfort/fluidfs/fluid/db"
 
 	"gopkg.in/yaml.v2"
 )
@@ -42,7 +42,7 @@ type Configuration interface {
 // from YAML configuration files and supplies the primary inputs to the
 // FluidFS server as well as connection interfaces to clients.
 type Config struct {
-	PID      int             `yaml:"pid"`             // Used to determine replica presidence
+	PID      uint            `yaml:"pid"`             // Used to determine replica presidence
 	Name     string          `yaml:"name,omitempty"`  // The name of the replica
 	Host     string          `yaml:"host,omitempty"`  // The listen address or host the replica
 	Port     int             `yaml:"port,omitempty"`  //  The port the replica listens on
@@ -156,7 +156,7 @@ func (conf *Config) Read(path string) error {
 func (conf *Config) Defaults() error {
 
 	// Select a random process id
-	conf.PID = rand.Intn(1000)
+	conf.PID = uint(rand.Intn(1000))
 
 	// Get the Hostname
 	name, err := os.Hostname()
@@ -315,7 +315,7 @@ type DatabaseConfig struct {
 func (conf *DatabaseConfig) Defaults() error {
 
 	// The default driver is the boltdb driver
-	conf.Driver = db.BoltDBDriver
+	conf.Driver = kvdb.BoltDBDriver
 
 	// The default path to the database is in a hidden directory in the home
 	// directory of the user, namely ~/.fluidfs/cache.db
@@ -334,7 +334,7 @@ func (conf *DatabaseConfig) Validate() error {
 	conf.Driver = Regularize(conf.Driver)
 
 	// Ensure that the driver is in the list of drivers.
-	if !ListContains(conf.Driver, db.DriverNames) {
+	if !ListContains(conf.Driver, kvdb.DriverNames) {
 		return fmt.Errorf("Improperly configured: '%s' is not a valid database driver", conf.Driver)
 	}
 

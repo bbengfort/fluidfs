@@ -57,13 +57,11 @@ const (
 // API that serves both a web interface and the command line client.
 type C2SAPI struct {
 	Router *mux.Router
-	Fluid  *Replica
 }
 
 // Init the C2SAPI with a hook to the server that the API wraps.
-func (api *C2SAPI) Init(fluid *Replica) error {
+func (api *C2SAPI) Init() error {
 	// Initialize the API
-	api.Fluid = fluid
 	api.Router = mux.NewRouter().StrictSlash(true)
 
 	// Add handlers and routes
@@ -71,7 +69,7 @@ func (api *C2SAPI) Init(fluid *Replica) error {
 	api.AddHandler(MountEndpoint, api.MountHandler)
 
 	// Add the static files service from the binary assets
-	api.Router.Handle(RootEndpoint, WebLogger(api.Fluid.Logger, http.FileServer(assetFS())))
+	api.Router.Handle(RootEndpoint, WebLogger(logger, http.FileServer(assetFS())))
 
 	// No errors occurred
 	return nil
@@ -89,7 +87,7 @@ func (api *C2SAPI) Run(addr string, echan chan error) {
 	}
 
 	// Report the server status
-	api.Fluid.Logger.Info("starting C2S API and web interface at http://%s/", addr)
+	logger.Info("starting C2S API and web interface at http://%s/", addr)
 
 	// Listen and Serve
 	if err := srv.ListenAndServe(); err != nil {
@@ -125,7 +123,7 @@ func (api *C2SAPI) AddHandler(path string, inner APIHandler) {
 		}
 	})
 
-	handler := WebLogger(api.Fluid.Logger, outer)
+	handler := WebLogger(logger, outer)
 	api.Router.Handle(path, handler)
 }
 
@@ -138,7 +136,7 @@ func (api *C2SAPI) StatusHandler(r *http.Request) (int, JSON, error) {
 	data := make(JSON)
 	data["status"] = "ok"
 	data["timestamp"] = time.Now().Format(JSONDateTime)
-	data["mounts"] = api.Fluid.FS.Status()
+	data["mounts"] = fstab.Status()
 	return http.StatusOK, data, nil
 }
 
@@ -206,7 +204,7 @@ func (api *C2SAPI) MountHandler(r *http.Request) (int, JSON, error) {
 	}
 
 	// Add the mount point to the fs table.
-	if err := api.Fluid.FS.AddMountPoint(mp); err != nil {
+	if err := fstab.AddMountPoint(mp); err != nil {
 		return http.StatusInternalServerError, nil, err
 	}
 

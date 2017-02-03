@@ -9,8 +9,6 @@ import (
 	"github.com/urfave/cli"
 )
 
-var replica *fluid.Replica
-
 func main() {
 
 	// Load the .env file if it exists
@@ -20,7 +18,7 @@ func main() {
 	app := cli.NewApp()
 	app.Name = "fluidfs"
 	app.Usage = "A highly consistent distributed filesystem."
-	app.Version = fluid.Version()
+	app.Version = fluid.PackageVersion()
 
 	// Global flags
 	app.Flags = []cli.Flag{
@@ -52,8 +50,7 @@ func main() {
 }
 
 func initFluid(c *cli.Context) error {
-	replica = new(fluid.Replica)
-	if err := replica.Init(c.String("config")); err != nil {
+	if err := fluid.Init(c.String("config")); err != nil {
 		return cli.NewExitError(err.Error(), 1)
 	}
 
@@ -61,7 +58,7 @@ func initFluid(c *cli.Context) error {
 }
 
 func startReplica(c *cli.Context) error {
-	if err := replica.Run(); err != nil {
+	if err := fluid.Run(); err != nil {
 		return cli.NewExitError(err.Error(), 1)
 	}
 
@@ -70,5 +67,5 @@ func startReplica(c *cli.Context) error {
 
 func printConfig(c *cli.Context) {
 	// Print the configuration and exit
-	fmt.Println(replica.Config.String())
+	fmt.Println(fluid.ShowConfig())
 }

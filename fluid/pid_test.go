@@ -80,7 +80,7 @@ var _ = Describe("PID File", func() {
 
 			// Ensure the PID file does not exist
 			exists, _ := pathExists(pid.Path())
-			Ω(exists).Should(BeFalse())
+			Ω(exists).Should(BeFalse(), "PID file should not exist before test")
 
 			// Save the PID file
 			err := pid.Save()
@@ -93,7 +93,7 @@ var _ = Describe("PID File", func() {
 
 			// Ensure that the PID file exists
 			exists, _ = pathExists(pid.Path())
-			Ω(exists).Should(BeTrue())
+			Ω(exists).Should(BeTrue(), "PID file should exist after save")
 		})
 
 		It("should be able to load the PID file", func() {

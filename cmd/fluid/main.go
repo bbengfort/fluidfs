@@ -20,7 +20,7 @@ func main() {
 	app := cli.NewApp()
 	app.Name = "fluid"
 	app.Usage = "FluidFS replica client for status and control."
-	app.Version = fluid.Version()
+	app.Version = fluid.PackageVersion()
 
 	// Global flags
 	app.Flags = []cli.Flag{}

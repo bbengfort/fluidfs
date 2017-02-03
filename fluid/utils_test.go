@@ -91,4 +91,25 @@ var _ = Describe("Utils", func() {
 
 	})
 
+	Describe("numeric helpers", func() {
+
+		It("should determine the maximal value of uints", func() {
+			testCases := []struct {
+				vals []uint64
+				max  uint64
+			}{
+				{[]uint64{}, 0},
+				{[]uint64{319922, 319922, 319922}, 319922},
+				{[]uint64{434930, 434931}, 434931},
+				{[]uint64{100, 42, 810, 321, 1, 0, 3193, 2}, 3193},
+			}
+
+			for _, tt := range testCases {
+				Ω(MaxUInt64(tt.vals...)).Should(Equal(tt.max))
+			}
+
+		})
+
+	})
+
 })
