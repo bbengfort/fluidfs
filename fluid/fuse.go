@@ -12,6 +12,8 @@ import (
 	fusefs "bazil.org/fuse/fs"
 )
 
+const minBlockSize = uint64(512)
+
 //===========================================================================
 // Helper Functions and Initializations
 //===========================================================================
@@ -27,6 +29,19 @@ func DefaultMountOptions() map[string]fuse.MountOption {
 	return opts
 }
 
+// XAttr is a mapping of names to binary data for file systems that support
+// extended attributes or other data.
+type XAttr map[string][]byte
+
+// Entity represents a memfs.Node entity (to differentiate it from an fs.Node)
+type Entity interface {
+	IsDir() bool               // Returns true if the entity is a directory
+	IsArchive() bool           // Returns true if the entity is an archive (version history)
+	FuseType() fuse.DirentType // Returns the fuse type for listing
+	Path() string              // Returns the full path to the entity
+	GetNode() *Node            // Returns the node for the entity type
+}
+
 //===========================================================================
 // FileSystem Handling
 //===========================================================================
@@ -38,6 +53,10 @@ type FileSystem struct {
 	Sequence   *sequence.Sequence // iNode sequence object
 	root       *Dir               // The root of the file system
 	mount      *MountPoint        // The location and options of this mount point
+	nfiles     uint64             // The number of files in the file system
+	ndirs      uint64             // The number of directories in the file system
+	nbytes     uint64             // The amount of data in the file system
+	readonly   bool               // If the file system is readonly or not
 }
 
 // Init a file system with the replica server and the specified mount point.
@@ -46,9 +65,12 @@ func (fs *FileSystem) Init(mp *MountPoint) error {
 	// Local storage of pointers to system resources
 	fs.mount = mp
 
-	// Fetch the root node from the database
-
 	// Handle the Sequence initialization
+	fs.Sequence, _ = sequence.New()
+
+	// Fetch the root node from the database
+	fs.root = new(Dir)
+	fs.root.Init("/", 0755, nil, fs)
 
 	return nil
 }
@@ -58,7 +80,7 @@ func (fs *FileSystem) Run(echan chan error) {
 	var err error
 
 	// Unmount the FS in case it was mounted with errors
-	// fuse.Unmount(fs.MountPoint.Path)
+	fuse.Unmount(fs.mount.Path)
 
 	// Mount the FS with the specified options.
 	if fs.Conn, err = fuse.Mount(
@@ -109,7 +131,7 @@ func (fs *FileSystem) Shutdown() error {
 
 // Root is called to obtain the Node for the file system root.
 func (fs *FileSystem) Root() (fusefs.Node, error) {
-	return Dir{}, nil
+	return fs.root, nil
 }
 
 // Destroy is called when the file system is shutting down.
@@ -117,9 +139,9 @@ func (fs *FileSystem) Root() (fusefs.Node, error) {
 // Linux only sends this request for block device backed (fuseblk)
 // filesystems, to allow them to flush writes to disk before the
 // unmount completes.
-// func (fs *FileSystem) Destroy() {
-// 	// No flush handling currently
-// }
+func (fs *FileSystem) Destroy() {
+	logger.Info("fluidfs://%s mounted at %s is being destroyed", fs.mount.Prefix, fs.mount.Path)
+}
 
 // GenerateInode is called to pick a dynamic inode number when it
 // would otherwise be 0.
@@ -136,10 +158,10 @@ func (fs *FileSystem) Root() (fusefs.Node, error) {
 //
 // Implementing this is useful to e.g. constrain the range of
 // inode values used for dynamic inodes.
-// func (fs *FileSystem) GenerateInode(parentInode uint64, name string) uint64 {
-// 	// Just return the default mechanism for now.
-// 	return fusefs.GenerateDynamicInode(parentInode, name)
-// }
+func (fs *FileSystem) GenerateInode(parentInode uint64, name string) uint64 {
+	// Just return the default mechanism for now.
+	return fusefs.GenerateDynamicInode(parentInode, name)
+}
 
 // Statfs is called to obtain file system metadata.
 // It should write that data to resp.

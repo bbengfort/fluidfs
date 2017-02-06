@@ -46,8 +46,8 @@ type MountPoint struct {
 	UUID      uuid.UUID // A device-unique ID for the mount point across replicas
 	Path      string    // The path to the location on disk to mount
 	Prefix    string    // The bucket or prefix for all names at this mount point
-	UID       int       // The default user (local fs) of the mount point
-	GID       int       // The default group (local fs) of the mount point
+	UID       uint32    // The default user (local fs) of the mount point
+	GID       uint32    // The default group (local fs) of the mount point
 	Store     bool      // Whether or not to store blobs for this mount point
 	Replicate bool      // Whether or not to replicate objects in this mount point
 	Comments  []string  // Comments in the fstab file preceeding the mount point definition
@@ -124,13 +124,17 @@ func (mp *MountPoint) Parse(line string) error {
 	mp.Prefix = fields[2]
 
 	// Parse the UID and GID integers
-	if mp.UID, err = strconv.Atoi(fields[3]); err != nil {
+	uid, err := strconv.ParseUint(fields[3], 10, 32)
+	if err != nil {
 		return fmt.Errorf("could not parse UID field: %s", err.Error())
 	}
+	mp.UID = uint32(uid)
 
-	if mp.GID, err = strconv.Atoi(fields[4]); err != nil {
+	gid, err := strconv.ParseUint(fields[4], 10, 32)
+	if err != nil {
 		return fmt.Errorf("could not parse GID field: %s", err.Error())
 	}
+	mp.GID = uint32(gid)
 
 	// Split the options on comma and store.
 	opts := strings.ToLower(fields[5])
@@ -161,8 +165,8 @@ func (mp *MountPoint) String() string {
 		mp.UUID.String(),
 		mp.Path,
 		mp.Prefix,
-		strconv.Itoa(mp.UID),
-		strconv.Itoa(mp.GID),
+		strconv.FormatUint(uint64(mp.UID), 10),
+		strconv.FormatUint(uint64(mp.GID), 10),
 		strings.Join(mp.Options, ","),
 		strconv.FormatBool(mp.Store),
 		strconv.FormatBool(mp.Replicate),
