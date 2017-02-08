@@ -8,6 +8,7 @@ import (
 	"crypto/sha1"
 	"crypto/sha256"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"hash"
 	"io"
@@ -102,6 +103,7 @@ type Chunker interface {
 	Chunk() Chunk   // Returns the current chunk on the chunker
 	Reset() error   // Reset the chunker to its original state
 	BlockSize() int // Returns the underlying size (or maximum size) of chunks
+	Offset() uint64 // The length of the current chunk from the current index
 }
 
 // NewChunker uses a storage configuration to initialize the appropriate
@@ -145,6 +147,15 @@ func NewChunker(data []byte, config *StorageConfig) (Chunker, error) {
 	}
 
 	return chunker, nil
+}
+
+// NewDefaultChunker creates a chunker using the global StorageConfig.
+func NewDefaultChunker(data []byte) (Chunker, error) {
+	if config == nil || config.Storage == nil {
+		return nil, errors.New("the default storage configuration isn't initialized")
+	}
+
+	return NewChunker(data, config.Storage)
 }
 
 // CreateHasher evalautes the string passed in and initializes the appropriate
@@ -378,22 +389,8 @@ func (c *FixedLengthChunker) Next() bool {
 // therefore it is advisable to only call the method once.
 func (c *FixedLengthChunker) Chunk() Chunk {
 
-	// Get the end index of the slice
-	endIndex := c.blockIndex + c.blockSize
-
-	// Determine if the block needs to extend over the block size to ensure
-	// the minimum block size is respected
-	if len(c.data)-endIndex < c.minBlockSize {
-		endIndex = len(c.data)
-	}
-
-	// Set the endIndex to prevent overflow
-	if endIndex > len(c.data) {
-		endIndex = len(c.data)
-	}
-
 	// Get the data slice and create the blob.
-	data := c.data[c.blockIndex:endIndex]
+	data := c.data[c.blockIndex:c.Offset()]
 	return &Blob{
 		data: data,
 		hash: c.Signature(data),
@@ -421,6 +418,27 @@ func (c *FixedLengthChunker) Reset() error {
 // between minBlockSize and blockSize + minBlockSize.
 func (c *FixedLengthChunker) BlockSize() int {
 	return c.blockSize
+}
+
+// Offset returns the end index of the current chunk, taking into account the
+// length of the data and the minimum block size requirement.
+// TODO: have this method match the variable length offset method. See #41
+func (c *FixedLengthChunker) Offset() uint64 {
+	// Get the end index of the slice
+	endIndex := c.blockIndex + c.blockSize
+
+	// Determine if the block needs to extend over the block size to ensure
+	// the minimum block size is respected
+	if len(c.data)-endIndex < c.minBlockSize {
+		endIndex = len(c.data)
+	}
+
+	// Set the endIndex to prevent overflow
+	if endIndex > len(c.data) {
+		endIndex = len(c.data)
+	}
+
+	return uint64(endIndex)
 }
 
 //===========================================================================
