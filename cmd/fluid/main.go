@@ -157,11 +157,11 @@ func fluidChunk(c *cli.Context) error {
 	}
 
 	if c.Int("minblocksize") != 0 {
-		conf.BlockSize = c.Int("blocksize")
+		conf.MinBlockSize = c.Int("minblocksize")
 	}
 
 	if c.Int("maxblocksize") != 0 {
-		conf.BlockSize = c.Int("blocksize")
+		conf.MaxBlockSize = c.Int("maxblocksize")
 	}
 
 	if err := conf.Validate(); err != nil {
@@ -169,6 +169,7 @@ func fluidChunk(c *cli.Context) error {
 	}
 
 	for idx, path := range c.Args() {
+
 		// Read the file from the specified path
 		data, err := ioutil.ReadFile(path)
 		if err != nil {
@@ -183,7 +184,7 @@ func fluidChunk(c *cli.Context) error {
 		}
 
 		// Begin output of chunker context
-		fmt.Printf("File %d at %s\n", idx, path)
+		fmt.Printf("File %d at %s\n", idx+1, path)
 
 		blocks := 0
 		offset := uint64(0)
@@ -193,11 +194,11 @@ func fluidChunk(c *cli.Context) error {
 
 			if conf.Chunking == fluid.VariableLengthChunking {
 				fmt.Printf("   Block %d: %d to %d\n", blocks, offset, offset+stride)
+				offset += stride
 			} else {
 				fmt.Printf("   Block %d: %d to %d\n", blocks, offset, stride)
+				offset = stride
 			}
-
-			offset += stride
 		}
 
 	}
