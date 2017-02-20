@@ -172,6 +172,21 @@ func (f *File) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse.ReadR
 	return nil
 }
 
+// Readlink reads a symbolic link.
+//
+// Symbolic links are currently implemented as files whose data is a pointer
+// to the linked object, hence why the Readlink function is implemented here.
+//
+// https://godoc.org/bazil.org/fuse/fs#NodeReadlinker
+func (f *File) Readlink(ctx context.Context, req *fuse.ReadlinkRequest) (string, error) {
+	f.fs.Lock()
+	defer f.fs.Unlock()
+
+	ln := string(f.Data)
+	logger.Debug("read link from %q to %q", f.Path(), ln)
+	return ln, nil
+}
+
 // Release the handle to the file. No associated documentation.
 //
 // https://godoc.org/bazil.org/fuse/fs#HandleReleaser

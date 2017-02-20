@@ -2,7 +2,7 @@
 SHELL := /bin/bash
 
 # Export targets not associated with files.
-.PHONY: all deps fmt test citest clean publish doc
+.PHONY: all pkg deps fmt test citest clean publish doc
 
 # Build FlowFS to a local build directory.
 all: fmt deps
@@ -10,7 +10,16 @@ all: fmt deps
 	@mkdir -p _bin/
 	@go build -v -o _bin/fluid ./cmd/fluid
 	@go build -v -o _bin/fluidfs ./cmd/fluidfs
-	@cp fixtures/config-example.yml _bin/
+
+# Build and package FlowFS to upload to GitHub
+pkg: fmt
+	@echo "Building and Packaging FluidFS"
+	@mkdir -p fluidfs-darwin-amd64
+	@go build -v -o fluidfs-darwin-amd64/fluid ./cmd/fluid
+	@go build -v -o fluidfs-darwin-amd64/fluidfs ./cmd/fluidfs
+	@cp fixtures/config-example.yml fluidfs-darwin-amd64/
+	@zip -r fluidfs-darwin-amd64.zip fluidfs-darwin-amd64/
+	@rm -rf fluidfs-darwin-amd64/
 
 # Use godep to collect dependencies.
 deps:
@@ -27,13 +36,13 @@ test:
 	ginkgo -r -v
 
 # Target for testing in continuous integration
-citest: 
+citest:
 	ginkgo -r -v --randomizeAllSpecs --randomizeSuites --failOnPending --cover --trace --race --compilers=2
 
-# Run Godoc server and open browers 
+# Run Godoc server and open browers
 doc:
 	- open http://localhost:6060/pkg/github.com/bbengfort/fluidfs/fluid/
-	- godoc --http=:6060 
+	- godoc --http=:6060
 
 # Clean build files
 clean:

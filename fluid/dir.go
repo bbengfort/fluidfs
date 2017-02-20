@@ -4,6 +4,7 @@ package fluid
 
 import (
 	"os"
+	"path/filepath"
 	"time"
 
 	"bazil.org/fuse"
@@ -53,9 +54,9 @@ func (d *Dir) GetNode() *Node {
 //
 // https://godoc.org/bazil.org/fuse/fs#NodeCreater
 func (d *Dir) Create(ctx context.Context, req *fuse.CreateRequest, resp *fuse.CreateResponse) (fs.Node, fs.Handle, error) {
-	// if d.IsArchive() || d.fs.readonly {
-	// 	return nil, nil, fuse.EPERM
-	// }
+	if d.IsArchive() || d.fs.readonly {
+		return nil, nil, fuse.EPERM
+	}
 
 	d.fs.Lock()
 	defer d.fs.Unlock()
@@ -91,11 +92,38 @@ func (d *Dir) Create(ctx context.Context, req *fuse.CreateRequest, resp *fuse.Cr
 // A LinkRequest is a request to create a hard link and contains the old node
 // ID and the NewName (a string), the old node is supplied to the server.
 //
+// NOTE: the 'name' is not modified, so potential debugging problem.
+//
+// The ln utility creates a new directory entry (linked file) which has the
+// same modes as the original file.  It is useful for maintaining multiple
+// copies of a file in many places at once without using up storage for the
+// "copies"; instead, a link "points" to the original copy.  There are two
+// types of links; hard links and symbolic links.  How a link "points" to a
+// file is one of the differences between a hard and symbolic link.
+//
+// By default, ln makes hard links.  A hard link to a file is
+// indistinguishable from the original directory entry; any changes to a file
+// are effectively independent of the name used to reference the file. Hard
+// links may not normally refer to directories and may not span file systems.
+//
 // https://godoc.org/bazil.org/fuse/fs#NodeLinker
-// TODO: Implement
-// func (d *Dir) Link(ctx context.Context, req *fuse.LinkRequest, old Node) (fs.Node, error) {
-// 	return nil, nil
-// }
+func (d *Dir) Link(ctx context.Context, req *fuse.LinkRequest, old fs.Node) (fs.Node, error) {
+	if d.IsArchive() || d.fs.readonly {
+		return nil, fuse.EPERM
+	}
+
+	d.fs.Lock()
+	defer d.fs.Unlock()
+
+	// Create the target from the reference
+	target := old.(*File)
+	target.Attrs.Nlink++
+
+	// Add the target to to the parent directory and return
+	d.Children[req.NewName] = target
+	logger.Info("link %q to %q", filepath.Join(d.Path(), req.NewName), target.Path())
+	return target, nil
+}
 
 // Mkdir creates (but not opens) a directory in the given directory.
 //
@@ -181,6 +209,7 @@ func (d *Dir) Remove(ctx context.Context, req *fuse.RemoveRequest) error {
 	d.Attrs.Mtime = time.Now()
 
 	// Update the file system state
+	// TODO: decrement the number of links
 	if ent.IsDir() {
 		d.fs.ndirs--
 	} else {
@@ -278,10 +307,43 @@ func (d *Dir) Lookup(ctx context.Context, name string) (fs.Node, error) {
 // TODO is the above true about directories?
 //
 // https://godoc.org/bazil.org/fuse/fs#NodeSymlinker
-// TODO: Implement
-// func (d *Dir) Symlink(ctx context.Context, req *fuse.SymlinkRequest) (Node, error) {
-//     return nil, fuse.EEXIST
-// }
+func (d *Dir) Symlink(ctx context.Context, req *fuse.SymlinkRequest) (fs.Node, error) {
+	if d.IsArchive() || d.fs.readonly {
+		return nil, fuse.EPERM
+	}
+
+	d.fs.Lock()
+	defer d.fs.Unlock()
+
+	// Update the directory Atime
+	d.Attrs.Atime = time.Now()
+
+	// Create the new symlink
+	ln := new(File)
+	ln.Init(req.NewName, os.ModeSymlink|0777, d, d.fs)
+
+	// Set the file's UID and GID to that of the caller
+	ln.Attrs.Uid = req.Header.Uid
+	ln.Attrs.Gid = req.Header.Gid
+
+	// Add the link data to the file
+	ln.Data = []byte(req.Target)
+	ln.dirty = true
+	ln.Attrs.Size = uint64(len(ln.Data))
+
+	// Add the symlink to the directory
+	d.Children[req.NewName] = ln
+
+	// Update the directory Mtime
+	d.Attrs.Mtime = time.Now()
+
+	// Update the file system state
+	d.fs.nfiles++
+
+	// Log the symlink creation and return the file, which is both node and handle.
+	logger.Info("create symlink from %s to %s", ln.Path(), req.Target)
+	return ln, nil
+}
 
 //===========================================================================
 // Dir fuse.Handle* Interface
