@@ -144,11 +144,12 @@
 <p>The versioning uses a three part version system, "a.b.c" - "a" represents a major release that may not be backwards compatible. "b" is incremented on minor releases that may contain extra features, but are backwards compatible. "c" releases are bug fixes or other micro changes that developers should feel free to immediately update to.</p>
 <h2 id="version-01">Version 0.1</h2>
 <ul>
-<li><strong>tag</strong>: <a href="https://github.com/bbengfort/fluidfs/releases/tag/v0.1">pending</a></li>
-<li><strong>release</strong>: Pending</li>
+<li><strong>tag</strong>: <a href="https://github.com/bbengfort/fluidfs/releases/tag/v0.1">v0.1</a></li>
+<li><strong>name</strong>: Gulfoss</li>
+<li><strong>release</strong>: February 8, 2017</li>
 <li><strong>commit</strong>: <a href="#">see tag</a></li>
 </ul>
-<p>This is the initial prototype version of the file system, and is still pending development.</p></div>
+<p>This release, codenamed Gullfoss implements a simple in-memory file system without replication as well as many of the library mechanisms required for the full system. The system is configured with a YAML configuration file and data files located in the home directory (per-user processes) along with an fstab-like configuration for mounting directories. The system implements the FUSE filesystem API and can be mounted and operated against in an in-memory fashion. Database interactions and interfaces are defined using the db module, and both BoltDB and LevelDB can be used as database drivers. Additionally, the Gulfoss version has fixed and variable length chunking for data storage and replication. Two interfaces - both a command line and web interface have been implemented for command and control. </p></div>
         </div>
 
         <footer class="col-md-12">
