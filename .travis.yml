@@ -18,6 +18,7 @@ script: make citest
 notifications:
     email:
         recipients:
-            - benjamin@bengfort.com
+            - bengfort@cs.umd.edu
+            - keleher@cs.umd.edu
         on_success: change
         on_failure: always

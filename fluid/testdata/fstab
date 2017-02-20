@@ -1,0 +1,16 @@
+# FluidFS fstab config last updated: Wednesday, 11 Jan 2017 at 17:14:25 -0500
+
+# This is the first mount point comment
+# This mount point is space separated for testing
+a418369c-54af-4661-a910-ee9b93c9f727 /data/mnt/alpha foo 501 22 defaults 1 1
+
+# This is the second mount point comment
+# This mount point is tab separated for testing
+8859b5c7-d860-11e6-9b0a-28cfe91c6851	/data/mnt/bravo	bar	501	22	red,auto,blot	0	1
+
+# This is the third mount point comment
+# And it is a long comment
+# This mount point has multiple whitespace types
+598c5619-d862-11e6-9360-28cfe91c6851        /data/mnt/charlie baz     1002	42 defaults	1	0
+
+# This comment should go away.

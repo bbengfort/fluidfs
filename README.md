@@ -11,6 +11,44 @@
 
 For more information, please see the documentation: [bbengfort.github.io/fluidfs][docs].
 
+## Getting Started
+
+The easiest way to get started with Go is to download the source code and install it using the `go get` command as follows:
+
+    $ go get github.com/bbengfort/fluidfs
+    $ go install github.com/bbengfort/fluidfs/cmd/...
+
+Two commands should now be in your `$PATH`: the `fluidfs` command, which runs the FluidFS server and the `fluid` command, a client to the server. In order to set the configuration for FluidFS, create a folder in your home directory called `.fluidfs` and copy the `fixtures/config-example.yml` file to that folder.
+
+    $ mkdir ~/.fluidfs
+    $ cp fixtures/config-example.yml ~/.fluidfs/config.yml
+
+The configuration file has many comments to guide you in the setup. Open the file for editing and ensure that at least the `pid` configuration is set to a number greater than 0. You can then start the FluidFS server as follows:
+
+    $ fluidfs start
+
+This should run the server, but since no mount points have been defined, there will be no file system interaction. Define a mount point with the client:
+
+    $ fluid mount ~user ~/Fluid
+
+This creates the ~user prefix (bucket) and mounts it to the directory Fluid in your home directory. Make sure that this directory exists! You may have to restart the FluidFS server for changes to take effect. Once done, you can `cd` into the `~/Fluid` directory, create and modify files as needed, and FluidFS will track them.
+
+To view the web interface for FluidFS, open it as follows:
+
+    $ fluid web
+
+This will open the default browser to the web interface. 
+
+## Binary Assets
+
+The web interface for FluidFS are compiled as binary assets along with the fluidfs server. When adding new web interface functionality, ensure that the assets are rebuilt by using the following command:
+
+```
+$ go-bindata-assetfs assets/...
+```
+
+Make sure when you do so, you're in the `fluid` directory. Note that you'll have to change the package of the generated `bindata_assetfs.go` file, and potentially also handle the naming of several of the functions that fail the linter test. For more information on the binary assets, see: [go-bindata-assetfs](https://github.com/elazarl/go-bindata-assetfs).
+
 ## Development
 
 The primary interface is a command line program that interacts directly with the fluid library. Note that `cmd/fluid/main.go` uses the [CLI](https://github.com/urfave/cli) library rather than implementing console commands itself. Building from source is implemented using the included Makefile, which fetches dependencies and builds locally rather than to the `$GOPATH`:

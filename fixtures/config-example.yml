@@ -1,0 +1,85 @@
+# This is an example configuration for FluidFS
+# Modify to your local settings, rename and place in one of the following:
+#
+#   - /etc/fluidfs/config.yml
+#   - ~/.fluidfs/config.yml
+#   - $(pwd)/fluidfs.yml
+#
+# Note is preferable to store configurations in ~/.fluidfs/config.yml
+
+# The process id (or precedence id) must be unique across all replicas and
+# determines presidence during version conflicts. If commented out, the
+# replica will select a random number between 1 and 1000.
+pid: 0
+
+# The replica name (must be unique), usually the hostname of the device.
+# Note if Name is null it will be set to the hostname of the device.
+# name: null
+
+# The IP address or hostname of the replica to listen for connections on.
+# Note that this must be a well formed IP address, but should not contain a
+# port number suffixed to the address. If null is supplied then FluidFS will
+# do its best to detect the external IP address of the machine and use that.
+# host: null
+
+# The port to listen on, the default port is 4157.
+port: 4157
+
+# The path to the fstab file that configures mount points. If null or omitted,
+# the fstab file will be created at ~/.fluid/fstab. The fstab file can be
+# modified by both the application and the user, but with care.
+# fstab: null
+
+# Configuration for application logging
+logging:
+
+    # The log level can be one of DEBUG, INFO, WARN, ERROR or FATAL
+    level: INFO
+
+    # Specify a path to log to a file, if null or empty will log to stdout
+    # path: null
+
+# Configuration for the state cache database
+database:
+
+    # The driver for the database, either boltdb (default) or leveldb
+    driver: boltdb
+
+    # The path to the database file on disk. If null or omitted, the database
+    # will be created in the user home directory at ~/.fluid/cache.bdb
+    # path: null
+
+# Configuration for blob storage and chunking
+storage:
+
+    # The path on disk to store data blobs. If null or omitted, the storage
+    # directory will be created in the user home directory at ~/.fluid/data/
+    # Note that this path will be created if it doesn't exist and that the user
+    # must have access permissions to it or the FluidFS daemon will not start.
+    # path: null
+
+    # Select either variable (default) or fixed length chunking
+    chunking: variable
+
+    # Set the block size in bytes. This is the target block size for variable
+    # length chunking and the size of all chunks (except possibly the last)
+    # for fixed length chunking.
+    block_size: 4096
+
+    # Set the minimum block size in bytes. This is used in both variable and
+    # fixed length chunking. In fixed length chunking it determines whether or
+    # the last block is greater than or small than the block_size.
+    min_block_size: 2048
+
+    # Set the maximal blcok size in bytes. This is only used in variable
+    # length chunking to bound the size of the rolling window. If using fixed
+    # length chunking, set this equal to the block size.
+    max_block_size: 8192
+
+    # Specify the hashing algorithm to use. This algorithm determines how
+    # chunks are uniquely identified by their signature. Different hashing
+    # algorithms have different opportunities for security, performance, and
+    # collision avoidance. The default is sha256. Current options for hashing
+    # include:  md5, sha1, sha224, sha256, and murmur.
+    # Future algorithms to include are: CityHash, FarmHash, and SipHash.
+    hashing: sha256
