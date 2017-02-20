@@ -9,6 +9,8 @@ all: fmt deps
 	@echo "Building FluidFS"
 	@mkdir -p _bin/
 	@go build -v -o _bin/fluid ./cmd/fluid
+	@go build -v -o _bin/fluidfs ./cmd/fluidfs
+	@cp fixtures/config-example.yml _bin/
 
 # Use godep to collect dependencies.
 deps:
