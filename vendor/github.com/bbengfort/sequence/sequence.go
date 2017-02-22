@@ -34,6 +34,7 @@ type Incrementer interface {
 	Init(params ...uint64) error // Initialize the Incrementer with values
 	Next() (uint64, error)       // Get the next value in the sequence and update
 	Restart() error              // Restarts the sequence if possible
+	Update(val uint64) error     // Update the state of the Incrementer
 	Current() (uint64, error)    // Returns the current value of the Incrementer
 	IsStarted() bool             // Returns the state of the Incrementer
 	String() string              // Returns a string representation of the state
@@ -271,6 +272,24 @@ func (s *Sequence) Restart() error {
 
 	// Set current based on the minvalue and the increment.
 	s.current = s.minvalue - s.increment
+	return nil
+}
+
+// Update the sequence to the current value. If the update value violates the
+// monotonically increasing or decreasing rule, an error is returned.
+func (s *Sequence) Update(val uint64) error {
+	// monotonically increasing error
+	if s.increment > 0 && val < s.current {
+		return errors.New("cannot decrease monotonically increasing sequence")
+	}
+
+	// monotonically decreasing error
+	if s.increment < 0 && val > s.current {
+		return errors.New("cannot increase monotonically decreasing sequence")
+	}
+
+	// Update the sequence.
+	s.current = val
 	return nil
 }
 

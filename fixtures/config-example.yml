@@ -30,6 +30,10 @@ port: 4157
 # modified by both the application and the user, but with care.
 # fstab: null
 
+# The delay in milliseconds to flush the metadata in the file system. If null 
+# or omitted the default flush delay is 750 milliseconds.
+# flush_delay: 750
+
 # Configuration for application logging
 logging:
 

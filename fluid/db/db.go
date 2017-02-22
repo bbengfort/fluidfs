@@ -36,6 +36,7 @@ type Database interface {
 	Batch(keys [][]byte, values [][]byte, bucket string) error // Batch insert key/value pairs into a bucket
 	Scan(prefix []byte, bucket string) (*Cursor, error)        // Scan a group of keys with a particular prefix
 	Keys(bucket string) (*Cursor, error)                       // Returns all the keys for a bucket
+	Count(bucket string) (uint64, error)                       // Returns the number of keys in the bucket
 }
 
 // Config defines a methods that a struct should provide to be considered a

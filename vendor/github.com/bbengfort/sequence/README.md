@@ -54,6 +54,16 @@ Which will return all the even numbers from 2 to 500 (inclusive). Sequences can 
 err := seq.Reset()
 ```
 
+Sequences can also be updated to a specific value, so long as the value doesn't violate the monotonically increasing or decreasing rule. If it does, the `Update()` function will return an error:
+
+```go
+err := seq.Update(42) // err == nil
+seq.Next()
+err = seq.Update(42) // err != nil
+```
+
+Note that the `Reset()` method is the only function that could violate the monotonicity of the `Sequence` object.  
+
 ### Sequence State
 
 To get the state of a sequence, you can use the following methods:

@@ -52,6 +52,24 @@ func (bdb *BoltDB) Close() error {
 	return bdb.db.Close()
 }
 
+// Count the number of keys in the given bucket.
+func (bdb *BoltDB) Count(bucket string) (uint64, error) {
+	var count uint64
+
+	err := bdb.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(bucket))
+		c := b.Cursor()
+
+		for k, _ := c.First(); k != nil; k, _ = c.Next() {
+			count++
+		}
+
+		return nil
+	})
+
+	return count, err
+}
+
 //===========================================================================
 // BoltDB interaction methods
 //===========================================================================

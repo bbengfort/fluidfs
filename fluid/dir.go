@@ -3,6 +3,8 @@
 package fluid
 
 import (
+	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -10,6 +12,8 @@ import (
 	"bazil.org/fuse"
 	"bazil.org/fuse/fs"
 	"golang.org/x/net/context"
+
+	kvdb "github.com/bbengfort/fluidfs/fluid/db"
 )
 
 //===========================================================================
@@ -22,7 +26,8 @@ import (
 // lookup without having to do a key scan.
 type Dir struct {
 	Node
-	Children map[string]Entity // Contents of the directory
+	Children map[string]string // References to the children of the directory
+	entities map[string]Entity // Contents of the directory, pointers to Nodes
 }
 
 // Init the directory with the required properties for the directory.
@@ -31,8 +36,9 @@ func (d *Dir) Init(name string, mode os.FileMode, parent *Dir, memfs *FileSystem
 	mode = os.ModeDir | mode
 	d.Node.Init(name, mode, parent, memfs)
 
-	// Make the children mapping
-	d.Children = make(map[string]Entity)
+	// Make the entities mapping
+	d.Children = make(map[string]string)
+	d.entities = make(map[string]Entity)
 }
 
 //===========================================================================
@@ -42,6 +48,145 @@ func (d *Dir) Init(name string, mode os.FileMode, parent *Dir, memfs *FileSystem
 // GetNode returns a pointer to the embedded Node object
 func (d *Dir) GetNode() *Node {
 	return &d.Node
+}
+
+// GetType returns the directory node type for two-phase lookup
+func (d *Dir) GetType() *NodeType {
+	return &NodeType{
+		NodeDirType,
+		d.FluidPath(),
+	}
+}
+
+// Store the directory to persistant storage. Directories are only stored as
+// meta information in the key/value embedded database. Version information
+// about directories is not replicated nor tracked; directories only exist if
+// they contain files, or locally if they were created by a user.
+func (d *Dir) Store() error {
+	// Don't do work if the meta data isn't dirty
+	if !d.metadirty {
+		return nil
+	}
+
+	// Get the node type
+	ntype := d.GetType()
+
+	// Marshall the directory into bytes data.
+	data, err := json.Marshal(d)
+	if err != nil {
+		return fmt.Errorf("could not marshal directory: %s", err)
+	}
+
+	// Put the data into prefixes namespace
+	if err := db.Put([]byte(ntype.Key), data, kvdb.PrefixesBucket); err != nil {
+		return fmt.Errorf("could not store prefix: %s", err)
+	}
+
+	// Marshal the node type
+	data, err = json.Marshal(ntype)
+	if err != nil {
+		return fmt.Errorf("could not marshal node type: %s", err)
+	}
+
+	// Put the node type into the global namespace
+	if err := db.Put([]byte(d.FluidPath()), data, kvdb.NamesBucket); err != nil {
+		return fmt.Errorf("could not store name %s: %s", d.FluidPath(), err)
+	}
+
+	// Set metadirty to false
+	d.metadirty = false
+	return nil
+}
+
+// Fetch the directory from persistant storage. The directory is populated by
+// passing in the path to the directory from the prefix.
+func (d *Dir) Fetch(key string) error {
+	// Fetch the key from the prefixes bucket
+	val, err := db.Get([]byte(key), kvdb.PrefixesBucket)
+	if err != nil {
+		return err
+	}
+
+	// Unmarshall the directory metadata into the struct
+	if err := json.Unmarshal(val, &d); err != nil {
+		return err
+	}
+
+	// Update the directory with current information
+	d.expanded = false
+	d.metadirty = false
+	d.entities = make(map[string]Entity)
+	return nil
+}
+
+// Expand the directory fully in memory by fetching children.
+func (d *Dir) Expand() error {
+	// Don't expand if already expanded
+	if d.expanded {
+		return nil
+	}
+
+	for name, fpath := range d.Children {
+		// Only expand the child if it is not in the entities map
+		if _, ok := d.entities[name]; !ok {
+			if err := d.ExpandChild(name, fpath); err != nil {
+				// NOTE: specific error is logged in Expandchild
+				msg := "could not fully expand expand %s"
+				logger.Error(msg, d)
+				return err
+			}
+		}
+	}
+
+	// Set expanded to true and return
+	d.expanded = true
+	return nil
+}
+
+// ExpandChild is a directory helper function to expand one child by the full
+// fluid path from the database. This function is called by Expand on a per-
+// child basis, and can be called individually from the lookup function to
+// save memory. ExpandChild first has to lookup the entry in the namespace
+// bucket, then retrieve the appropriate entity. This two step process will
+// update the entities directly, and this method will only return an error if
+// for some reason the operation cannot be completed.
+func (d *Dir) ExpandChild(name string, fpath string) error {
+	// Fetch the entity from the database
+	ent, err := FetchEntity(fpath)
+	if err != nil {
+		msg := "could not expand %s: %s"
+		logger.Error(msg, fpath, err)
+		return err
+	}
+
+	// Add the parent and filesystem to the child
+	node := ent.GetNode()
+	node.fs = d.fs
+	node.parent = d
+
+	// Add the entity to the entities map
+	d.entities[name] = ent
+	return nil
+}
+
+// Free the directory from memory usage by removing the child pointers.
+func (d *Dir) Free() error {
+
+	for name, ent := range d.entities {
+		if ent.IsDir() {
+			// First call free on all child directories
+			if err := ent.Free(); err != nil {
+				return err
+			}
+		}
+
+		// Delete the entity from the mapping
+		delete(d.entities, name)
+	}
+
+	// Mark expanded to false and return
+	d.expanded = false
+	return nil
 }
 
 //===========================================================================
@@ -66,17 +211,19 @@ func (d *Dir) Create(ctx context.Context, req *fuse.CreateRequest, resp *fuse.Cr
 
 	// Create the file
 	f := new(File)
-	f.Init(req.Name, req.Mode, d, d.fs)
+	f.Init(req.Name, req.Mode, d, nil, d.fs)
 
 	// Set the file's UID and GID to that of the caller
 	f.Attrs.Uid = req.Header.Uid
 	f.Attrs.Gid = req.Header.Gid
 
 	// Add the file to the directory
-	d.Children[f.Name] = f
+	d.Children[f.Name] = f.FluidPath()
+	d.entities[f.Name] = f
 
-	// Update the directory Mtime
+	// Update the directory Mtime and mark metadirty
 	d.Attrs.Mtime = time.Now()
+	d.metadirty = true
 
 	// Update the file system state
 	d.fs.nfiles++
@@ -93,6 +240,8 @@ func (d *Dir) Create(ctx context.Context, req *fuse.CreateRequest, resp *fuse.Cr
 // ID and the NewName (a string), the old node is supplied to the server.
 //
 // NOTE: the 'name' is not modified, so potential debugging problem.
+// NOTE: Hard links are not currently stored in the metadata storage.
+// NOTE: target.Attrs.Nlink-- never occurs even on hard link removal.
 //
 // The ln utility creates a new directory entry (linked file) which has the
 // same modes as the original file.  It is useful for maintaining multiple
@@ -120,7 +269,7 @@ func (d *Dir) Link(ctx context.Context, req *fuse.LinkRequest, old fs.Node) (fs.
 	target.Attrs.Nlink++
 
 	// Add the target to to the parent directory and return
-	d.Children[req.NewName] = target
+	d.entities[req.NewName] = target
 	logger.Info("link %q to %q", filepath.Join(d.Path(), req.NewName), target.Path())
 	return target, nil
 }
@@ -150,10 +299,12 @@ func (d *Dir) Mkdir(ctx context.Context, req *fuse.MkdirRequest) (fs.Node, error
 	c.Attrs.Gid = req.Header.Gid
 
 	// Add the directory to the directory
-	d.Children[c.Name] = c
+	d.entities[c.Name] = c
+	d.Children[c.Name] = c.FluidPath()
 
-	// Update the directory Mtime
+	// Update the directory Mtime and mark metadirty
 	d.Attrs.Mtime = time.Now()
+	d.metadirty = true
 
 	// Update the file system state
 	d.fs.ndirs++
@@ -191,22 +342,26 @@ func (d *Dir) Remove(ctx context.Context, req *fuse.RemoveRequest) error {
 	var ok bool
 
 	// Get the node from the directory by name.
-	if ent, ok = d.Children[req.Name]; !ok {
+	if ent, ok = d.entities[req.Name]; !ok {
 		logger.Debug("(error) could not find node to remove named %q in %q", req.Name, d.Path())
 		return fuse.EEXIST
 	}
 
 	// Do not remove a directory that contains files.
-	if ent.IsDir() && len(ent.(*Dir).Children) > 0 {
+	if ent.IsDir() && len(ent.(*Dir).entities) > 0 {
 		logger.Debug("(error) will not remove non-empty directory %q in %q", req.Name, d.Path())
 		return fuse.EIO
 	}
 
-	// Delete the entry from the directory Children
+	// Delete the entry from the directory
 	delete(d.Children, req.Name)
+	delete(d.entities, req.Name)
 
-	// Update the directory Mtime
+	// TODO: Delete the entry from meta storage?
+
+	// Update the directory Mtime and mark metadata as dirty
 	d.Attrs.Mtime = time.Now()
+	d.metadirty = true
 
 	// Update the file system state
 	// TODO: decrement the number of links
@@ -251,7 +406,7 @@ func (d *Dir) Rename(ctx context.Context, req *fuse.RenameRequest, newDir fs.Nod
 	dst.Attrs.Atime = time.Now()
 
 	// Get the child entity from the directory
-	if ent, ok = d.Children[req.OldName]; !ok {
+	if ent, ok = d.entities[req.OldName]; !ok {
 		logger.Debug("(error) could not find %q in %q to move", req.OldName, d.Path())
 		return fuse.EEXIST
 	}
@@ -260,12 +415,17 @@ func (d *Dir) Rename(ctx context.Context, req *fuse.RenameRequest, newDir fs.Nod
 	node = ent.GetNode()
 	node.Name = req.NewName
 	node.Attrs.Mtime = time.Now()
+	node.metadirty = true
 
-	dst.Children[req.NewName] = ent // Add the entity to the new directory
+	// Add the entity to the new directory and update.
+	dst.entities[req.NewName] = ent
 	dst.Attrs.Mtime = time.Now()
+	dst.metadirty = true
 
-	delete(dst.Children, req.OldName) // Delete the entity from the old directory
+	// Delete the entity from the old directory and update.
+	delete(dst.entities, req.OldName)
 	d.Attrs.Mtime = time.Now()
+	d.metadirty = true
 
 	logger.Info("moved %q from %q to %q", req.OldName, d.Path(), ent.Path())
 	return nil
@@ -289,14 +449,30 @@ func (d *Dir) Lookup(ctx context.Context, name string) (fs.Node, error) {
 	// Update the directory Atime
 	d.Attrs.Atime = time.Now()
 
-	if ent, ok := d.Children[name]; ok {
+	// We could expand the entire dirctory here, but instead we'll just
+	// expand the child node being looked up. This will hopefully save on
+	// memory for one-off lookups and will make later expansion faster.
+	// First we ensure that this name is in the Children, otherwise we
+	// return error; no such file or directory.
+	if fpath, ok := d.Children[name]; ok {
 		logger.Debug("lookup %s in %s", name, d.Path())
 
+		// Check and see if the entity is in the entities map, if not, expand.
+		if _, ok := d.entities[name]; !ok {
+			if err := d.ExpandChild(name, fpath); err != nil {
+				// NOTE: error is logged in expand child
+				return nil, fuse.EIO
+			}
+		}
+
+		// Get the entity and return the appropriate node
+		ent := d.entities[name]
 		if ent.IsDir() {
 			return ent.(*Dir), nil
 		}
 
 		return ent.(*File), nil
+
 	}
 
 	logger.Debug("(error) couldn't lookup %s in %s", name, d.Path())
@@ -320,22 +496,24 @@ func (d *Dir) Symlink(ctx context.Context, req *fuse.SymlinkRequest) (fs.Node, e
 
 	// Create the new symlink
 	ln := new(File)
-	ln.Init(req.NewName, os.ModeSymlink|0777, d, d.fs)
+	ln.Init(req.NewName, os.ModeSymlink|0777, d, nil, d.fs)
 
 	// Set the file's UID and GID to that of the caller
 	ln.Attrs.Uid = req.Header.Uid
 	ln.Attrs.Gid = req.Header.Gid
 
 	// Add the link data to the file
-	ln.Data = []byte(req.Target)
+	ln.data = []byte(req.Target)
 	ln.dirty = true
-	ln.Attrs.Size = uint64(len(ln.Data))
+	ln.Attrs.Size = uint64(len(ln.data))
 
 	// Add the symlink to the directory
-	d.Children[req.NewName] = ln
+	d.Children[req.NewName] = ln.FluidPath()
+	d.entities[req.NewName] = ln
 
-	// Update the directory Mtime
+	// Update the directory Mtime and metadirty
 	d.Attrs.Mtime = time.Now()
+	d.metadirty = true
 
 	// Update the file system state
 	d.fs.nfiles++
@@ -362,8 +540,16 @@ func (d *Dir) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
 	// Set the access time
 	d.Attrs.Atime = time.Now()
 
+	// If not expanded, expand the directory
+	if !d.expanded {
+		if err := d.Expand(); err != nil {
+			// NOTE: error is logged in the Expand() method.
+			return nil, fuse.EIO
+		}
+	}
+
 	// Create the Dirent response
-	for _, entity := range d.Children {
+	for _, entity := range d.entities {
 		node := entity.GetNode()
 		dirent := fuse.Dirent{
 			Inode: node.Attrs.Inode,

@@ -3,11 +3,15 @@
 package fluid
 
 import (
+	"encoding/json"
+	"fmt"
 	"os"
 	"time"
 
 	"bazil.org/fuse"
 	"golang.org/x/net/context"
+
+	kvdb "github.com/bbengfort/fluidfs/fluid/db"
 )
 
 //===========================================================================
@@ -19,17 +23,35 @@ import (
 // not chunked or broken up until transport.
 type File struct {
 	Node
-	Data  []byte // Actual data contained by the File
-	dirty bool   // If data has been written but not flushed
+	Version  *Version // The lamport scalar version of the file
+	Previous *Version // The version that directly preceeded this file
+	Blobs    []string // The blobs that make up the file
+	data     []byte   // Actual data contained by the File
+	dirty    bool     // If data has been written but not flushed
 }
 
 // Init the file and create the data array
-func (f *File) Init(name string, mode os.FileMode, parent *Dir, memfs *FileSystem) {
+func (f *File) Init(name string, mode os.FileMode, parent *Dir, prev *Version, memfs *FileSystem) {
 	// Init the embedded node.
 	f.Node.Init(name, mode, parent, memfs)
 
-	// Make the data array
-	f.Data = make([]byte, 0, 0)
+	// Create the version for the file
+	if prev != nil {
+		// If there is a previous version, get the next version using the
+		// replica's precedence ID (stored in the replica's configuration).
+		f.Version = prev.Next(config.PID)
+		f.Previous = prev
+	} else {
+		// Otherwise create a new version change for the new file.
+		// TODO: What happens if there is a name conflict?
+		f.Version = NewVersion()
+		f.Previous = nil
+	}
+
+	// Make the data arrays
+	f.Blobs = make([]string, 0, 0)
+	f.data = make([]byte, 0, 0)
+	f.dirty = false
 }
 
 //===========================================================================
@@ -39,6 +61,119 @@ func (f *File) Init(name string, mode os.FileMode, parent *Dir, memfs *FileSyste
 // GetNode returns a pointer to the embedded Node object
 func (f *File) GetNode() *Node {
 	return &f.Node
+}
+
+// GetType returns the file node type for two-phase lookup
+func (f *File) GetType() *NodeType {
+	return &NodeType{
+		NodeFileType,
+		fmt.Sprintf("(%s, %d, %d)", f.FluidPath(), f.Version.Scalar, f.Version.PID),
+	}
+}
+
+// Store a file in persistant storage. Files are stored in two places; first,
+// the version meta data of the file is stored in a key/value embedded
+// database and second, the data that comprises the file is stored in chunked
+// blobs stored on disk. The store method saves both meta data and blobs.
+func (f *File) Store() error {
+
+	if err := f.StoreMeta(); err != nil {
+		return err
+	}
+
+	if err := f.StoreBlobs(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// StoreMeta is a helper function to specifically store the metadata of the
+// file. It is called from the Store method, but does not handle blobs.
+func (f *File) StoreMeta() error {
+	// Don't waste time with the database if the metadata isn't dirty.
+	if !f.metadirty {
+		return nil
+	}
+
+	// Get the node type
+	ntype := f.GetType()
+
+	// Marshall the file into bytes data.
+	data, err := json.Marshal(f)
+	if err != nil {
+		return fmt.Errorf("could not marshal file: %s", err)
+	}
+
+	// Put the data into versions namespace
+	if err := db.Put([]byte(ntype.Key), data, kvdb.VersionsBucket); err != nil {
+		return fmt.Errorf("could not store version: %s", err)
+	}
+
+	// Marshal the node type
+	data, err = json.Marshal(ntype)
+	if err != nil {
+		return fmt.Errorf("could not marshal node type: %s", err)
+	}
+
+	// Put the node type into the global namespace
+	if err := db.Put([]byte(f.FluidPath()), data, kvdb.NamesBucket); err != nil {
+		return fmt.Errorf("could not store name %s: %s", f.FluidPath(), err)
+	}
+
+	// Set the metadirty to false
+	f.metadirty = false
+	return nil
+}
+
+// StoreBlobs is a helper function to specifically store the blobs that make
+// up the complete file. It is called by the Store method but does not handle
+// metadata and can be called independently to force data to disk.
+func (f *File) StoreBlobs() error {
+	//  Don't waste time with chunking if the file isn't dirty
+	if !f.dirty {
+		return nil
+	}
+
+	logger.Warn("blob data storage not implemented yet")
+
+	// Set the dirty flag to false
+	f.dirty = false
+	return nil
+}
+
+// Fetch the file from persistant storage. Files are fetched by retrieving
+// meta data from the embedded database by version. Historical version
+// information can be passed in order to fetch file archives. Note taht the
+// block data making up the file isn't fetched from disk until read.
+func (f *File) Fetch(key string) error {
+	// Fetch the key from the prefixes bucket
+	val, err := db.Get([]byte(key), kvdb.VersionsBucket)
+	if err != nil {
+		return err
+	}
+
+	// Unmarshall the directory metadata into the struct
+	if err := json.Unmarshal(val, &f); err != nil {
+		return err
+	}
+
+	// Set expanded to false
+	f.expanded = false
+	return nil
+}
+
+// Expand the file fully in memory by loading the data blocks from disk.
+func (f *File) Expand() error {
+	logger.Warn("file expand has not been implemented yet")
+	return nil
+}
+
+// Free the file from memory usage by emptying the data array.
+func (f *File) Free() error {
+	f.data = make([]byte, 0, 0)
+	f.expanded = false
+	return nil
 }
 
 //===========================================================================
@@ -66,7 +201,7 @@ func (f *File) Setattr(ctx context.Context, req *fuse.SetattrRequest, resp *fuse
 
 		f.Attrs.Size = req.Size
 		f.Attrs.Blocks = Blocks(f.Attrs.Size)
-		f.Data = f.Data[:req.Size] // If size > len(f.Data) then panic!
+		f.data = f.data[:req.Size] // If size > len(f.data) then panic!
 		logger.Debug("truncate size from %d to %d on file %d", f.Attrs.Size, req.Size, f.ID)
 
 		f.fs.Unlock() // Must unlock before Node.Setattr is called!
@@ -100,7 +235,7 @@ func (f *File) Fsync(ctx context.Context, req *fuse.FsyncRequest) error {
 //
 // https://godoc.org/bazil.org/fuse/fs#HandleFlusher
 func (f *File) Flush(ctx context.Context, req *fuse.FlushRequest) error {
-	logger.Info("flush file %d (dirty: %t, contains %d bytes with size %d)", f.ID, f.dirty, len(f.Data), f.Attrs.Size)
+	logger.Info("flush file %d (dirty: %t, contains %d bytes with size %d)", f.ID, f.dirty, len(f.data), f.Attrs.Size)
 
 	if f.IsArchive() || f.fs.readonly {
 		return fuse.EPERM
@@ -115,7 +250,13 @@ func (f *File) Flush(ctx context.Context, req *fuse.FlushRequest) error {
 
 	f.Attrs.Atime = time.Now()
 	f.Attrs.Mtime = f.Attrs.Atime
-	f.dirty = false
+
+	// NOTE: Store both the data and the meta data to disk.
+	if err := f.Store(); err != nil {
+		msg := "could not write blobs to disk for %s: %s"
+		logger.Error(msg, f, err)
+		return fuse.EIO
+	}
 
 	return nil
 }
@@ -138,7 +279,7 @@ func (f *File) Flush(ctx context.Context, req *fuse.FlushRequest) error {
 //
 // 	// Return the data with no error.
 // 	logger.Debug("read all file %d", f.ID)
-// 	return f.Data, nil
+// 	return f.data, nil
 // }
 
 // Read requests to read data from the handle.
@@ -156,6 +297,13 @@ func (f *File) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse.ReadR
 	f.fs.Lock()
 	defer f.fs.Unlock()
 
+	if !f.expanded {
+		if err := f.Expand(); err != nil {
+			// NOTE: error logged in the Expand method
+			return fuse.EIO
+		}
+	}
+
 	// Find the end of the data slice to return.
 	to := uint64(req.Offset) + uint64(req.Size)
 	if to > f.Attrs.Size {
@@ -166,7 +314,7 @@ func (f *File) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse.ReadR
 	f.Attrs.Atime = time.Now()
 
 	// Set the data on the response object.
-	resp.Data = f.Data[req.Offset:to]
+	resp.Data = f.data[req.Offset:to]
 
 	logger.Debug("read %d bytes from offset %d in file %d", req.Size, req.Offset, f.ID)
 	return nil
@@ -182,7 +330,14 @@ func (f *File) Readlink(ctx context.Context, req *fuse.ReadlinkRequest) (string,
 	f.fs.Lock()
 	defer f.fs.Unlock()
 
-	ln := string(f.Data)
+	if !f.expanded {
+		if err := f.Expand(); err != nil {
+			// NOTE: error logged in the Expand method
+			return "", fuse.EIO
+		}
+	}
+
+	ln := string(f.data)
 	logger.Debug("read link from %q to %q", f.Path(), ln)
 	return ln, nil
 }
@@ -216,7 +371,14 @@ func (f *File) Write(ctx context.Context, req *fuse.WriteRequest, resp *fuse.Wri
 	f.fs.Lock()
 	defer f.fs.Unlock()
 
-	olen := uint64(len(f.Data))   // original data length
+	if !f.expanded {
+		if err := f.Expand(); err != nil {
+			// NOTE: error logged in the Expand method
+			return fuse.EIO
+		}
+	}
+
+	olen := uint64(len(f.data))   // original data length
 	wlen := uint64(len(req.Data)) // data write length
 	off := uint64(req.Offset)     // offset of the write
 	lim := off + wlen             // The final length of the data
@@ -240,8 +402,8 @@ func (f *File) Write(ctx context.Context, req *fuse.WriteRequest, resp *fuse.Wri
 			to = olen
 		}
 
-		copy(buf[0:to], f.Data[0:to])
-		f.Data = buf
+		copy(buf[0:to], f.data[0:to])
+		f.data = buf
 
 		// Update the size attributes of the file
 		f.Attrs.Size = lim
@@ -252,7 +414,7 @@ func (f *File) Write(ctx context.Context, req *fuse.WriteRequest, resp *fuse.Wri
 	}
 
 	// Copy the data from the request into our data buffer
-	copy(f.Data[off:lim], req.Data[:])
+	copy(f.data[off:lim], req.Data[:])
 
 	// Set the attributes on the response
 	resp.Size = int(wlen)

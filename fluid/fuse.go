@@ -4,6 +4,7 @@ package fluid
 
 import (
 	"fmt"
+	"path/filepath"
 	"sync"
 
 	"github.com/bbengfort/sequence"
@@ -29,24 +30,12 @@ func DefaultMountOptions() map[string]fuse.MountOption {
 	return opts
 }
 
-// XAttr is a mapping of names to binary data for file systems that support
-// extended attributes or other data.
-type XAttr map[string][]byte
-
-// Entity represents a memfs.Node entity (to differentiate it from an fs.Node)
-type Entity interface {
-	IsDir() bool               // Returns true if the entity is a directory
-	IsArchive() bool           // Returns true if the entity is an archive (version history)
-	FuseType() fuse.DirentType // Returns the fuse type for listing
-	Path() string              // Returns the full path to the entity
-	GetNode() *Node            // Returns the node for the entity type
-}
-
 //===========================================================================
 // FileSystem Handling
 //===========================================================================
 
 // FileSystem implements the fuse.FS* interfaces.
+// TODO: How to store the statistics in the database?
 type FileSystem struct {
 	sync.Mutex                    // A file system can be locked
 	Conn       *fuse.Conn         // A connection to the FUSE server
@@ -69,8 +58,25 @@ func (fs *FileSystem) Init(mp *MountPoint) error {
 	fs.Sequence, _ = sequence.New()
 
 	// Fetch the root node from the database
-	fs.root = new(Dir)
-	fs.root.Init("/", 0755, nil, fs)
+	// TODO: store more of the file system information in the database
+	entity, err := FetchEntity(filepath.Join("/", fs.mount.Prefix))
+	if err != nil {
+		// Could not find prefix in the database -- create a new one
+		fs.root = new(Dir)
+		fs.root.Init("/", 0755, nil, fs)
+		if err := fs.root.Store(); err != nil {
+			return err
+		}
+	} else {
+		var ok bool
+		fs.root, ok = entity.(*Dir)
+		if !ok {
+			return fmt.Errorf("could not load root prefix %s from database", fs.mount.Prefix)
+		}
+
+		// Add the file system to the root node.
+		fs.root.fs = fs
+	}
 
 	return nil
 }

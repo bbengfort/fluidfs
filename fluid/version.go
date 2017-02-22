@@ -8,6 +8,11 @@ import "fmt"
 // Lamport Scalar Version Type
 //===========================================================================
 
+// NewVersion creates a new version sequence with the local precedence ID.
+func NewVersion() *Version {
+	return &Version{config.PID, 1, 1}
+}
+
 // Version implements a Lamport scalar version number that has two components:
 // the process id and the scalar, a montonically increasing counter. Versions
 // can be updated from another version object, which will increase the scalar

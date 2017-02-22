@@ -4,17 +4,100 @@
 package fluid
 
 import (
+	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"time"
 
 	"bazil.org/fuse"
 	"golang.org/x/net/context"
+
+	kvdb "github.com/bbengfort/fluidfs/fluid/db"
 )
+
+// A node can be either a file or directory. Types are stored in the global
+// namespace for two-phase lookups in the database.
+const (
+	NodeDirType  = "dir"
+	NodeFileType = "file"
+	NodeRootType = "root"
+)
+
+//===========================================================================
+// Node Helper Functions
+//===========================================================================
+
+// FetchEntity performs a two-phase lookup from the database. First it looks
+// up the name in the global namespace bucket, then performs the correct
+// lookup for either a directory or a file, returning the appropriate entity.
+func FetchEntity(fpath string) (Entity, error) {
+
+	// Fetch the node type data from the namespace bucket.
+	val, err := db.Get([]byte(fpath), kvdb.NamesBucket)
+	if err != nil {
+		return nil, fmt.Errorf("could not fetch name %s: %s", fpath, err)
+	}
+
+	// Unmarshal the node type object
+	ntype := new(NodeType)
+	if err := json.Unmarshal(val, &ntype); err != nil {
+		return nil, fmt.Errorf("could not read node type of %s: %s", fpath, err)
+	}
+
+	// Create the entity based on the type
+	var entity Entity
+	switch ntype.Type {
+	case NodeDirType:
+		entity = new(Dir)
+	case NodeFileType:
+		entity = new(File)
+	default:
+		return nil, fmt.Errorf("unknown node type: %s", ntype.Type)
+	}
+
+	// Fetch the entity meta information from the database
+	if err := entity.Fetch(ntype.Key); err != nil {
+		return nil, fmt.Errorf("could not fetch entity %s with key %s: %s", fpath, ntype.Key, err)
+	}
+
+	return entity, nil
+}
 
 //===========================================================================
 // Node Types and Constructor
 //===========================================================================
+
+// XAttr is a mapping of names to binary data for file systems that support
+// extended attributes or other data.
+type XAttr map[string][]byte
+
+// EntityMapper is a function that can be applied to any entity in the FS.
+type EntityMapper func(e Entity) error
+
+// Entity represents a memfs.Node entity (to differentiate it from an fs.Node)
+type Entity interface {
+	IsDir() bool                   // Returns true if the entity is a directory
+	IsArchive() bool               // Returns true if the entity is an archive (version history)
+	FuseType() fuse.DirentType     // Returns the fuse type for listing
+	Path() string                  // Returns the full path to the entity
+	GetNode() *Node                // Returns the node for the entity type
+	GetType() *NodeType            // Returns the node type of the entity
+	Store() error                  // Save the entity to persistant storage
+	Fetch(key string) error        // Populate the entity with data from persistant storage
+	Expand() error                 // Expand the entity fully in memory
+	Free() error                   // Free the entity from memory
+	Traverse(f EntityMapper) error // Traverse the directory structure applying the mapper
+}
+
+// NodeType represents a global "view" of the namespace and maps full fluid
+// path names to specific directories and files. This object is serialized in
+// the namespace bucket, while directories are serialized in the prefix bucket
+// and files are serialized in the versions bucket.
+type NodeType struct {
+	Type string // String representation of the type
+	Key  string // The key to lookup the metadata for the node
+}
 
 // Node contains shared data and structures for both files and directories.
 // Methods returning Node should take care to return the same Node when the
@@ -22,12 +105,14 @@ import (
 // new NodeID, causing spurious cache invalidations, extra lookups and
 // aliasing anomalies. This may not matter for a simple, read-only filesystem.
 type Node struct {
-	ID     uint64      // Unique ID of the Node
-	Name   string      // Name of the Node
-	Attrs  fuse.Attr   // Node attributes and permissions
-	XAttrs XAttr       // Extended attributes on the node
-	Parent *Dir        // Parent directory of the Node
-	fs     *FileSystem // Stored reference to the file system
+	ID        uint64      // Unique ID of the Node
+	Name      string      // Name of the Node
+	Attrs     fuse.Attr   // Node attributes and permissions
+	XAttrs    XAttr       // Extended attributes on the node
+	parent    *Dir        // Parent directory of the Node
+	fs        *FileSystem // Stored reference to the file system
+	metadirty bool        // If the metadata on the node has been changed
+	expanded  bool        // If the node is fully expanded in memory
 }
 
 // Init a Node with the required properties for storage in the file system.
@@ -35,9 +120,11 @@ func (n *Node) Init(name string, mode os.FileMode, parent *Dir, fs *FileSystem) 
 	// Manage the Node properties
 	n.ID, _ = fs.Sequence.Next()
 	n.Name = name
-	n.Parent = parent
 	n.XAttrs = make(XAttr)
+	n.parent = parent
 	n.fs = fs
+	n.metadirty = true
+	n.expanded = true
 
 	// Manage the fuse.Attr properties
 	now := time.Now()
@@ -84,12 +171,20 @@ func (n *Node) FuseType() fuse.DirentType {
 	return fuse.DT_File
 }
 
-// Path returns a string representation of the full path of the node.
+// Path returns a string representation of the path of the node relative to
+// the mount point (e.g. excluding the prefix for the global namespace).
 func (n *Node) Path() string {
-	if n.Parent != nil {
-		return filepath.Join(n.Parent.Path(), n.Name)
+	if n.parent != nil {
+		return filepath.Join(n.parent.Path(), n.Name)
 	}
 	return n.Name
+}
+
+// FluidPath returns a string representation of the global path to the node
+// including the prefix of the global namespace. This path is used in global
+// namespace operations, but not used when operating against the mount point.
+func (n *Node) FluidPath() string {
+	return filepath.Join("/", n.fs.mount.Prefix, n.Path())
 }
 
 // GetNode returns a pointer to the embedded Node object

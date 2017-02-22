@@ -141,6 +141,9 @@ func Run() error {
 	// Run the C2S API and web interface
 	go web.Run(pid.Addr(), echan)
 
+	// Run the Flusher
+	go Flusher(config.FlushDelay, echan)
+
 	// Listen for an error from any of the go routines (also blocks)
 	// Log the error and shutdown gracefully (returning only shutdown errors).
 	err = <-echan

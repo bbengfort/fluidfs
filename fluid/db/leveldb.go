@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/syndtr/goleveldb/leveldb"
+	"github.com/syndtr/goleveldb/leveldb/util"
 )
 
 //===========================================================================
@@ -35,6 +36,19 @@ func (ldb *LevelDB) Close() error {
 func (ldb *LevelDB) CreateBucket(bucket string, key []byte) []byte {
 	prefixed := fmt.Sprintf("%s/%s", bucket, key)
 	return []byte(prefixed)
+}
+
+// Count the number of keys in the given bucket.
+func (ldb *LevelDB) Count(bucket string) (uint64, error) {
+	var count uint64
+	iter := ldb.db.NewIterator(util.BytesPrefix([]byte(bucket)), nil)
+
+	for iter.Next() {
+		count++
+	}
+
+	iter.Release()
+	return count, iter.Error()
 }
 
 //===========================================================================

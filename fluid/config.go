@@ -42,15 +42,17 @@ type Configuration interface {
 // from YAML configuration files and supplies the primary inputs to the
 // FluidFS server as well as connection interfaces to clients.
 type Config struct {
-	PID      uint            `yaml:"pid"`             // Used to determine replica presidence
-	Name     string          `yaml:"name,omitempty"`  // The name of the replica
-	Host     string          `yaml:"host,omitempty"`  // The listen address or host the replica
-	Port     int             `yaml:"port,omitempty"`  //  The port the replica listens on
-	FStab    string          `yaml:"fstab,omitempty"` // The path to the fstab file on disk
-	Logging  *LoggingConfig  `yaml:"logging"`         // Configuration for logging
-	Database *DatabaseConfig `yaml:"database"`        // Database configuration
-	Storage  *StorageConfig  `yaml:"storage"`         // Storage/Chunking configuration
-	Loaded   []string        `yaml:"-"`               // Reference to the loaded configuration paths
+	PID        uint            `yaml:"pid"`                   // Used to determine replica presidence
+	Name       string          `yaml:"name,omitempty"`        // The name of the replica
+	Host       string          `yaml:"host,omitempty"`        // The listen address or host the replica
+	Port       int             `yaml:"port,omitempty"`        // The port the replica listens on
+	FStab      string          `yaml:"fstab,omitempty"`       // The path to the fstab file on disk
+	FlushDelay int64           `yaml:"flush_delay,omitempty"` // Milliseconds to sleep betweeen flushes
+	Logging    *LoggingConfig  `yaml:"logging"`               // Configuration for logging
+	Database   *DatabaseConfig `yaml:"database"`              // Database configuration
+	Storage    *StorageConfig  `yaml:"storage"`               // Storage/Chunking configuration
+	Loaded     []string        `yaml:"-"`                     // Reference to the loaded configuration paths
+
 }
 
 //===========================================================================
@@ -173,6 +175,9 @@ func (conf *Config) Defaults() error {
 		conf.FStab = filepath.Join(usr.HomeDir, HiddenConfigDirectory, "fstab")
 	}
 
+	// Set the default flush delay
+	conf.FlushDelay = 750
+
 	// Create the logging configuration and call its defaults.
 	conf.Logging = new(LoggingConfig)
 	conf.Logging.Defaults()
@@ -204,6 +209,11 @@ func (conf *Config) Validate() error {
 	// Return an error if there is no fstab path
 	if conf.FStab == "" {
 		return errors.New("Improperly configured: an fstab path is required.")
+	}
+
+	// Return an error if flush delay is zero
+	if conf.FlushDelay < 1 {
+		return errors.New("Improperly configured: specify a flush delay.")
 	}
 
 	// Validate the LoggingConfig
