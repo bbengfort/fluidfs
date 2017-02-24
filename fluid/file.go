@@ -31,19 +31,15 @@ type File struct {
 }
 
 // Init the file and create the data array
-func (f *File) Init(name string, mode os.FileMode, parent *Dir, prev *Version, memfs *FileSystem) {
+func (f *File) Init(name string, mode os.FileMode, parent *Dir, memfs *FileSystem) {
 	// Init the embedded node.
 	f.Node.Init(name, mode, parent, memfs)
 
-	// Create the version for the file
-	if prev != nil {
-		// If there is a previous version, get the next version using the
-		// replica's precedence ID (stored in the replica's configuration).
-		f.Version = prev.Next(config.PID)
-		f.Previous = prev
-	} else {
-		// Otherwise create a new version change for the new file.
-		// TODO: What happens if there is a name conflict?
+	// If the file was created without a fetch, set the Version.
+	// NOTE: file is initialized after fetch do not overwrite Version!
+	if f.Version == nil {
+		// Set the version as root with no previous version.
+		// NOTE: the version won't be updated until flush.
 		f.Version = NewVersion()
 		f.Previous = nil
 	}
@@ -65,6 +61,13 @@ func (f *File) GetNode() *Node {
 
 // GetType returns the file node type for two-phase lookup
 func (f *File) GetType() *NodeType {
+	if f.Version.IsRoot() {
+		return &NodeType{
+			NodeRootType,
+			fmt.Sprintf("(%s, ROOT)", f.FluidPath()),
+		}
+	}
+
 	return &NodeType{
 		NodeFileType,
 		fmt.Sprintf("(%s, %d, %d)", f.FluidPath(), f.Version.Scalar, f.Version.PID),
@@ -77,11 +80,13 @@ func (f *File) GetType() *NodeType {
 // blobs stored on disk. The store method saves both meta data and blobs.
 func (f *File) Store() error {
 
-	if err := f.StoreMeta(); err != nil {
+	// NOTE: store blobs comes first because it changes the meta data.
+	if err := f.StoreBlobs(); err != nil {
 		return err
 	}
 
-	if err := f.StoreBlobs(); err != nil {
+	// NOTE: store meta comes after because it changes the meta data.
+	if err := f.StoreMeta(); err != nil {
 		return err
 	}
 
@@ -123,6 +128,7 @@ func (f *File) StoreMeta() error {
 
 	// Set the metadirty to false
 	f.metadirty = false
+	logger.Debug("stored metadata for %s", f.FluidPath())
 	return nil
 }
 
@@ -135,10 +141,31 @@ func (f *File) StoreBlobs() error {
 		return nil
 	}
 
-	logger.Warn("blob data storage not implemented yet")
+	// Create the chunker for the given data
+	chunker, err := NewDefaultChunker(f.data)
+	if err != nil {
+		return err
+	}
+
+	// Clear out the current blobs and make a new blob array.
+	f.Blobs = make([]string, 0, 0)
+
+	// Perform the chunking and store the blobs
+	for chunker.Next() {
+		blob := chunker.Chunk()                // get the next chunk of the file
+		f.Blobs = append(f.Blobs, blob.Hash()) // store the identity of the hash
+		err := blob.Save("")                   // store the blob on disk
+		if err != nil {
+			return err
+		}
+	}
+
+	// Set the metadirty flag to true as we've modified Blobs.
+	f.metadirty = true
 
 	// Set the dirty flag to false
 	f.dirty = false
+	logger.Debug("stored %d blobs on disk", len(f.Blobs))
 	return nil
 }
 
@@ -160,12 +187,29 @@ func (f *File) Fetch(key string) error {
 
 	// Set expanded to false
 	f.expanded = false
+	logger.Info("fetched node %d: %s version %s -> %s", f.ID, f.Name, f.Previous, f.Version)
 	return nil
 }
 
 // Expand the file fully in memory by loading the data blocks from disk.
 func (f *File) Expand() error {
-	logger.Warn("file expand has not been implemented yet")
+	// If already expanded don't worry about doing extra work.
+	if f.expanded {
+		return nil
+	}
+
+	// Load blobs from disk based on their hash signature
+	// TODO: if blob is not on disk, request it from a remote node.
+	for _, hash := range f.Blobs {
+		blob, err := FindBlob(hash, "")
+		if err != nil {
+			return err
+		}
+
+		f.data = append(f.data, blob.Data()...)
+	}
+
+	f.expanded = true
 	return nil
 }
 
@@ -250,6 +294,13 @@ func (f *File) Flush(ctx context.Context, req *fuse.FlushRequest) error {
 
 	f.Attrs.Atime = time.Now()
 	f.Attrs.Mtime = f.Attrs.Atime
+
+	// Update the version information on the file
+	// TODO: what if there is a name conflict at root?
+	logger.Warn("before version bump node %d: %s is %s -> %s", f.ID, f.Name, f.Previous, f.Version)
+	f.Previous = f.Version
+	f.Version = f.Version.Next(config.PID)
+	logger.Warn("updated %s version from %s to %s", f.Name, f.Previous, f.Version)
 
 	// NOTE: Store both the data and the meta data to disk.
 	if err := f.Store(); err != nil {

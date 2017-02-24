@@ -223,6 +223,27 @@ func MakeBlob(data []byte, hash string) (*Blob, error) {
 	}, nil
 }
 
+// FindBlob loads a blob from disk, initializing it based on the signature.
+// NOTE: if the dataDir is not supplied it will use the globally configured
+// storage path by default.
+func FindBlob(hash string, dataDir string) (*Blob, error) {
+	// Use the default data directory
+	if dataDir == "" {
+		dataDir = config.Storage.Path
+	}
+
+	// Create and load the blob
+	blob := &Blob{hash: hash}
+	path := filepath.Join(dataDir, blob.Path())
+	err := blob.Load(path)
+	if err != nil {
+		return nil, err
+	}
+
+	// Return the blob data
+	return blob, nil
+}
+
 // Size computes the size of the blob in bytes if it is not already cached,
 // memoizes the data in memory and returns the cached value.
 func (b *Blob) Size() int {
@@ -265,6 +286,9 @@ func (b *Blob) Path() string {
 //
 // Currently the Load method expects the hash to be the filename followed by
 // the .blob extension as defined by the Blob.Save method.
+//
+// NOTE: the load method expects the blob to exist already and doesn't handle
+// blob requests from other servers, etc.
 func (b *Blob) Load(path string) error {
 
 	// Read the data from the file.
@@ -297,7 +321,13 @@ func (b *Blob) Load(path string) error {
 // This method will therefore create the appropriate subdirectories and join
 // it to the root dataDir passed into the function and write the file to that
 // location so Blob.Load can use the filename to retrieve the hash.
+//
+// NOTE: if the dataDir is an empty string, by default this method will save
+// to the data directory of the global configuration.
 func (b *Blob) Save(dataDir string) error {
+	if dataDir == "" {
+		dataDir = config.Storage.Path
+	}
 
 	// Compute the path with the data directory
 	// NOTE: this stores the data directory with the blob; is this a problem for serialization?

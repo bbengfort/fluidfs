@@ -10,7 +10,7 @@ import "fmt"
 
 // NewVersion creates a new version sequence with the local precedence ID.
 func NewVersion() *Version {
-	return &Version{config.PID, 1, 1}
+	return &Version{config.PID, 0, 0}
 }
 
 // Version implements a Lamport scalar version number that has two components:
@@ -25,6 +25,12 @@ type Version struct {
 	PID    uint   // Process or Precendence ID (assigned per replica)
 	Scalar uint64 // Montononically increasing scalar value
 	Latest uint64 // The latest observed value, used to calculate next.
+}
+
+// IsRoot returns true if the version has a zero value for the scalar, meaning
+// it is a version that was created but cannot be assigned to a file.
+func (v *Version) IsRoot() bool {
+	return v.Scalar == 0
 }
 
 // Update the version with the latest seen, computed as the maximal scalar
@@ -54,7 +60,7 @@ func (v *Version) Next(pid uint) *Version {
 
 // String representation of a version
 func (v *Version) String() string {
-	return fmt.Sprintf("(%d, %d)", v.PID, v.Scalar)
+	return fmt.Sprintf("(%d, %d)", v.Scalar, v.PID)
 }
 
 //===========================================================================

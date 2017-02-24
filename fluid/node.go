@@ -279,7 +279,17 @@ func (n *Node) Getxattr(ctx context.Context, req *fuse.GetxattrRequest, resp *fu
 	if data, ok := n.XAttrs[req.Name]; ok {
 		logger.Debug("getting xattr named %s on node %d", req.Name, n.ID)
 		if req.Size != 0 {
-			resp.Xattr = data[:req.Size]
+			// Find the end of the data slice to return.
+			to := uint64(req.Position) + uint64(req.Size)
+
+			// Don't return slices greater than the data available.
+			maxlen := uint64(len(data))
+			if to > maxlen {
+				to = maxlen
+			}
+
+			// Set the attribute response to the data slice
+			resp.Xattr = data[req.Position:to]
 		} else {
 			resp.Xattr = data
 		}

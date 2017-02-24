@@ -44,14 +44,22 @@ func (fs *FileSystem) Flush() error {
 			if d.metadirty {
 				flushes++
 			}
-		} else {
-			f := e.(*File)
-			if f.metadirty {
-				flushes++
-			}
+
+			// Store the metadata for the directory
+			return d.Store()
+
 		}
 
-		return e.Store()
+		// If it's not a directory, it's a file (for now).
+		f := e.(*File)
+		if f.metadirty {
+			flushes++
+		}
+
+		// Store the metadata for the file
+		// Rely on f.Flush() to handle blobs, version changes, and sync.
+		return f.StoreMeta()
+
 	})
 
 	if err == nil && flushes > 0 {

@@ -211,7 +211,7 @@ func (d *Dir) Create(ctx context.Context, req *fuse.CreateRequest, resp *fuse.Cr
 
 	// Create the file
 	f := new(File)
-	f.Init(req.Name, req.Mode, d, nil, d.fs)
+	f.Init(req.Name, req.Mode, d, d.fs)
 
 	// Set the file's UID and GID to that of the caller
 	f.Attrs.Uid = req.Header.Uid
@@ -419,11 +419,13 @@ func (d *Dir) Rename(ctx context.Context, req *fuse.RenameRequest, newDir fs.Nod
 
 	// Add the entity to the new directory and update.
 	dst.entities[req.NewName] = ent
+	dst.Children[req.NewName] = node.FluidPath()
 	dst.Attrs.Mtime = time.Now()
 	dst.metadirty = true
 
 	// Delete the entity from the old directory and update.
 	delete(dst.entities, req.OldName)
+	delete(dst.Children, req.OldName)
 	d.Attrs.Mtime = time.Now()
 	d.metadirty = true
 
@@ -496,7 +498,7 @@ func (d *Dir) Symlink(ctx context.Context, req *fuse.SymlinkRequest) (fs.Node, e
 
 	// Create the new symlink
 	ln := new(File)
-	ln.Init(req.NewName, os.ModeSymlink|0777, d, nil, d.fs)
+	ln.Init(req.NewName, os.ModeSymlink|0777, d, d.fs)
 
 	// Set the file's UID and GID to that of the caller
 	ln.Attrs.Uid = req.Header.Uid

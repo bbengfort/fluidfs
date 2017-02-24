@@ -58,6 +58,10 @@ func main() {
 					Name:  "f, force",
 					Usage: "don't ask before deleting",
 				},
+				cli.BoolFlag{
+					Name:  "c, cache",
+					Usage: "also clear the blobs cache",
+				},
 			},
 		},
 		{
@@ -131,8 +135,10 @@ func initDatabase(c *cli.Context) error {
 
 // Delete the database for a fresh start.
 func deleteDatabase(c *cli.Context) error {
+	// Get the database path
 	path := config.Database.Path
 
+	// Confirm deleting the database
 	if !c.Bool("force") {
 		msg := fmt.Sprintf("Delete the database at %s?", path)
 		confirm := promptConfirmation(msg)
@@ -142,27 +148,55 @@ func deleteDatabase(c *cli.Context) error {
 		}
 	}
 
+	// Delete the database
 	err := os.Remove(path)
 	if err != nil {
 		msg := fmt.Sprintf("could not delete database at %s", path)
 		return cli.NewExitError(msg, 1)
 	}
 
+	// Report successful database deletion
 	fmt.Printf("%s has been deleted\n", path)
+
+	// Also clear the blobs cache?
+	if c.Bool("cache") {
+		path = config.Storage.Path
+
+		// Confirm deleting the cache
+		if !c.Bool("force") {
+			msg := fmt.Sprintf("Delete the blobs cache at %s?", path)
+			confirm := promptConfirmation(msg)
+			if !confirm {
+				fmt.Println("Not deleting the blobs cache!")
+				return nil
+			}
+		}
+
+		// Delete the cache
+		err := os.RemoveAll(path)
+		if err != nil {
+			msg := fmt.Sprintf("could not delete blobs cache at %s", path)
+			return cli.NewExitError(msg, 1)
+		}
+
+		// Report successful blob cache deletion
+		fmt.Printf("blob cache at %s has been deleted\n", path)
+	}
+
 	return nil
 }
 
 // Count the number of items in the specified buckets or all buckets
 func countBucket(c *cli.Context) error {
-	var buckets []string
+	var toCount []string
 
 	if c.NArg() == 0 {
-		buckets = []string{fluiddb.NamesBucket, fluiddb.VersionsBucket, fluiddb.PrefixesBucket}
+		toCount = buckets
 	} else {
-		buckets = c.Args()
+		toCount = c.Args()
 	}
 
-	for _, bucket := range buckets {
+	for _, bucket := range toCount {
 		count, err := db.Count(bucket)
 		if err != nil {
 			return cli.NewExitError(err.Error(), 1)
