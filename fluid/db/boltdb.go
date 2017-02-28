@@ -3,6 +3,7 @@
 package db
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"time"
@@ -141,12 +142,50 @@ func (bdb *BoltDB) Batch(keys [][]byte, values [][]byte, bucket string) error {
 }
 
 // Scan a group of keys with a particular prefix using BoltDB prefix seek.
-func (bdb *BoltDB) Scan(prefix []byte, bucket string) (*Cursor, error) {
+func (bdb *BoltDB) Scan(prefix []byte, bucket string) Cursor {
+	cursor := &BoltCursor{
+		make(chan *KVPair), true, nil,
+	}
 
-	return nil, nil
+	go bdb.db.View(func(tx *bolt.Tx) error {
+		c := tx.Bucket([]byte(bucket)).Cursor()
+
+		for k, v := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, v = c.Next() {
+			pair := &KVPair{k, v}
+			cursor.pairs <- pair
+		}
+
+		cursor.hasNext = false
+		return nil
+	})
+
+	return cursor
 }
 
-// Keys gets all the keys for a bucket using BoltDB for each.
-func (bdb *BoltDB) Keys(bucket string) (*Cursor, error) {
-	return nil, nil
+//===========================================================================
+// BoltCursor type and methods
+//===========================================================================
+
+// BoltCursor implements the cursor interface, wrapping a view transaction
+// with a channel so that iteration can happen safely. This might not be the
+// fastest way to implement it, but it is the safest.
+type BoltCursor struct {
+	pairs   chan *KVPair // the channel to write pairs to.
+	hasNext bool         // whether or not the cursor has a next value.
+	err     error        // if there are any errors
+}
+
+// Next returns true if there is another key/value pair available.
+func (c *BoltCursor) Next() bool {
+	return c.hasNext
+}
+
+// Pair returns the current key/value pair on the cursor.
+func (c *BoltCursor) Pair() *KVPair {
+	return <-c.pairs
+}
+
+// Error returns any errors from the database transaction.
+func (c *BoltCursor) Error() error {
+	return c.err
 }

@@ -34,8 +34,7 @@ type Database interface {
 	Put(key []byte, value []byte, bucket string) error         // Put a key/value pair into the bucket
 	Delete(key []byte, bucket string) error                    // Delete a key from a bucket
 	Batch(keys [][]byte, values [][]byte, bucket string) error // Batch insert key/value pairs into a bucket
-	Scan(prefix []byte, bucket string) (*Cursor, error)        // Scan a group of keys with a particular prefix
-	Keys(bucket string) (*Cursor, error)                       // Returns all the keys for a bucket
+	Scan(prefix []byte, bucket string) Cursor                  // Scan a group of keys with a particular prefix
 	Count(bucket string) (uint64, error)                       // Returns the number of keys in the bucket
 }
 
@@ -49,8 +48,15 @@ type Config interface {
 // Cursor is an interator interface that enables iteration/search over
 // multiple key/value pairs with a single query.
 type Cursor interface {
-	Next() ([]byte, []byte) // Returns the next key/value pair
-	Error() error           // Returns any errors on the cursor
+	Next() bool    // True if there is another k/v pair
+	Pair() *KVPair // Returns the next k/v pair
+	Error() error  // Returns any errors on the cursor
+}
+
+// KVPair is a struct for holding key/value pairs
+type KVPair struct {
+	key []byte
+	val []byte
 }
 
 //===========================================================================

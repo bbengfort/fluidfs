@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/syndtr/goleveldb/leveldb"
+	"github.com/syndtr/goleveldb/leveldb/iterator"
 	"github.com/syndtr/goleveldb/leveldb/util"
 )
 
@@ -106,12 +107,39 @@ func (ldb *LevelDB) Batch(keys [][]byte, values [][]byte, bucket string) error {
 }
 
 // Scan a group of keys with a particular prefix using LevelDB prefix seek.
-func (ldb *LevelDB) Scan(prefix []byte, bucket string) (*Cursor, error) {
-
-	return nil, nil
+func (ldb *LevelDB) Scan(prefix []byte, bucket string) Cursor {
+	prefix = ldb.CreateBucket(bucket, prefix)
+	iter := ldb.db.NewIterator(util.BytesPrefix(prefix), nil)
+	return &LevelDBCursor{iter}
 }
 
-// Keys gets all the keys for a bucket using the LevelDB API
-func (ldb *LevelDB) Keys(bucket string) (*Cursor, error) {
-	return nil, nil
+//===========================================================================
+// LevelDBCursor type and methods
+//===========================================================================
+
+// LevelDBCursor implements the cursor interface, wrapping a prefix iterator
+// in the Cursor interface. This is the fastest method to access LevelDB data.
+type LevelDBCursor struct {
+	iter iterator.Iterator
+}
+
+// Next returns true if there is another key/value pair available.
+func (c *LevelDBCursor) Next() bool {
+	next := c.iter.Next()
+	if !next {
+		c.iter.Release()
+	}
+	return next
+}
+
+// Pair returns the current key/value pair on the cursor.
+func (c *LevelDBCursor) Pair() *KVPair {
+	return &KVPair{
+		c.iter.Key(), c.iter.Value(),
+	}
+}
+
+// Error returns any errors from the database transaction.
+func (c *LevelDBCursor) Error() error {
+	return c.iter.Error()
 }

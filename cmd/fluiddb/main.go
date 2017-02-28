@@ -11,6 +11,8 @@ import (
 	"strings"
 
 	"github.com/bbengfort/fluidfs/fluid"
+	"github.com/boltdb/bolt"
+	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/urfave/cli"
 
 	fluiddb "github.com/bbengfort/fluidfs/fluid/db"
@@ -70,6 +72,19 @@ func main() {
 			ArgsUsage: "[bucket...]",
 			Before:    initDatabase,
 			Action:    countBucket,
+		},
+		{
+			Name:      "export",
+			Usage:     "export a JSON file containing the key/values for the bucket",
+			ArgsUsage: "bucket",
+			Before:    initConfig,
+			Action:    exportBucket,
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name:  "o, output",
+					Usage: "specify the file to write to (by default, the bucket name)",
+				},
+			},
 		},
 		{
 			Name:      "get",
@@ -206,6 +221,93 @@ func countBucket(c *cli.Context) error {
 	}
 
 	return nil
+}
+
+// Export a bucket to a file
+func exportBucket(c *cli.Context) error {
+	if c.NArg() != 1 {
+		return cli.NewExitError("specify a single bucket to export", 1)
+	}
+
+	// Get the arguments for exporting
+	bucket := c.Args()[0]
+	output := c.String("output")
+	if output == "" {
+		output = fmt.Sprintf("%s.json", bucket)
+	}
+
+	// Open the file for writing JSON lines
+	f, err := os.Create(output)
+	if err != nil {
+		return cli.NewExitError(err.Error(), 1)
+	}
+	defer f.Close()
+
+	// Closure for writing key value pairs
+	writeKeyVal := func(key []byte, val []byte) error {
+		// Write the key
+		if _, err = f.Write(key); err != nil {
+			return err
+		}
+
+		// Write the seperator character
+		if _, err = f.WriteString("\t"); err != nil {
+			return err
+		}
+
+		// Write the value
+		if _, err = f.Write(val); err != nil {
+			return err
+		}
+
+		// Write the newline character
+		if _, err = f.WriteString("\n"); err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	if config.Database.Driver == fluiddb.BoltDBDriver {
+		bdb, err := bolt.Open(config.Database.Path, 0644, nil)
+		if err != nil {
+			return cli.NewExitError(err.Error(), 1)
+		}
+
+		err = bdb.View(func(tx *bolt.Tx) error {
+			b := tx.Bucket([]byte(bucket))
+			return b.ForEach(func(key []byte, val []byte) error {
+				return writeKeyVal(key, val)
+			})
+		})
+
+		if err != nil {
+			return cli.NewExitError(err.Error(), 1)
+		}
+
+		return nil
+	} else if config.Database.Driver == fluiddb.LevelDBDriver {
+		ldb, err := leveldb.OpenFile(config.Database.Path, nil)
+		if err != nil {
+			return cli.NewExitError(err.Error(), 1)
+		}
+
+		iter := ldb.NewIterator(nil, nil)
+		for iter.Next() {
+			writeKeyVal(iter.Key(), iter.Value())
+		}
+		iter.Release()
+		err = iter.Error()
+
+		if err != nil {
+			return cli.NewExitError(err.Error(), 1)
+		}
+
+		return nil
+	} else {
+		msg := fmt.Sprintf("export for %s driver not implemented", config.Database.Driver)
+		return cli.NewExitError(msg, 1)
+	}
 }
 
 // Print out the JSON representation for the specified keys
