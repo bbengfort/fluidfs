@@ -1,6 +1,6 @@
 {
 	"ImportPath": "github.com/bbengfort/fluidfs",
-	"GoVersion": "go1.7",
+	"GoVersion": "go1.8",
 	"GodepVersion": "v75",
 	"Packages": [
 		"./..."
