@@ -2,7 +2,7 @@
 SHELL := /bin/bash
 
 # Export targets not associated with files.
-.PHONY: all pkg deps fmt test citest clean publish doc
+.PHONY: all pkg deps fmt test citest clean publish doc protobuf
 
 # Build FlowFS to a local build directory.
 all: fmt deps
@@ -57,3 +57,8 @@ clean:
 publish:
 	@echo "Deploying docs to gh-pages branch"
 	@mkdocs gh-deploy --clean --quiet
+
+# Compile protocol buffers 
+protobuf:
+	@echo "Compiling protocol buffers"
+	@protoc -I fluid/comms/ fluid/comms/*.proto --go_out=plugins=grpc:fluid/comms

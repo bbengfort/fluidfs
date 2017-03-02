@@ -1,0 +1,26 @@
+// Defines the blob replication service with anti-entropy.
+// Compile with protoc -I comms/ comms/*.proto --go_out=plugins=grpc:comms
+
+syntax = "proto3";
+
+package comms;
+
+// PushRequest initiates the first phase of Anti-Entropy by letting another
+// node in the system know the current state of the blob tree.
+message PushRequest {
+    uint64 count = 1; // the total number of blobs in the tree
+    uint64 size = 2;  // the size of the tree in bytes
+}
+
+// PushReply allows the remote node to respond with a list of blobs to request
+// from the initiating server.
+message PushReply {
+    bool sync = 1; // whether or not sync is required
+}
+
+// BlobTalk defines the service that replicates blobs with anti-entropy.
+service BlobTalk {
+
+    rpc PushHandler(PushRequest) returns (PushReply) {}
+
+}

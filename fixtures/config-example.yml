@@ -34,6 +34,10 @@
 # or omitted the default flush delay is 750 milliseconds.
 # flush_delay: 750
 
+# The delay in milliseconds between pair-wise anti-entropy sessions for blob
+# replication. If null or omitted the default anti-entropy delay is 1250ms.
+# anti_entropy_delay: 1250
+
 # Configuration for application logging
 logging:
 

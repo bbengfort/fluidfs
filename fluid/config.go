@@ -39,15 +39,16 @@ type Configuration interface {
 // from YAML configuration files and supplies the primary inputs to the
 // FluidFS server as well as connection interfaces to clients.
 type Config struct {
-	Seed       int64           `yaml:"seed,omitempty"`        // Control random number generation
-	Name       string          `yaml:"name,omitempty"`        // The name of the replica
-	Hosts      string          `yaml:"hosts,omitempty"`       // The path to the hosts file on disk
-	FStab      string          `yaml:"fstab,omitempty"`       // The path to the fstab file on disk
-	FlushDelay int64           `yaml:"flush_delay,omitempty"` // Milliseconds to sleep betweeen flushes
-	Logging    *LoggingConfig  `yaml:"logging"`               // Configuration for logging
-	Database   *DatabaseConfig `yaml:"database"`              // Database configuration
-	Storage    *StorageConfig  `yaml:"storage"`               // Storage/Chunking configuration
-	Loaded     []string        `yaml:"-"`                     // Reference to the loaded configuration paths
+	Seed             int64           `yaml:"seed,omitempty"`               // Control random number generation
+	Name             string          `yaml:"name,omitempty"`               // The name of the replica
+	Hosts            string          `yaml:"hosts,omitempty"`              // The path to the hosts file on disk
+	FStab            string          `yaml:"fstab,omitempty"`              // The path to the fstab file on disk
+	FlushDelay       int64           `yaml:"flush_delay,omitempty"`        // Milliseconds to sleep betweeen flushes
+	AntiEntropyDelay int64           `yaml:"anti_entropy_delay,omitempty"` // Periodicity of anti-entropy blob replication
+	Logging          *LoggingConfig  `yaml:"logging"`                      // Configuration for logging
+	Database         *DatabaseConfig `yaml:"database"`                     // Database configuration
+	Storage          *StorageConfig  `yaml:"storage"`                      // Storage/Chunking configuration
+	Loaded           []string        `yaml:"-"`                            // Reference to the loaded configuration paths
 
 }
 
@@ -173,6 +174,9 @@ func (conf *Config) Defaults() error {
 	// Set the default flush delay
 	conf.FlushDelay = 750
 
+	// Set the default anti-entropy delay
+	conf.AntiEntropyDelay = 1250
+
 	// Create the logging configuration and call its defaults.
 	conf.Logging = new(LoggingConfig)
 	conf.Logging.Defaults()
@@ -209,6 +213,11 @@ func (conf *Config) Validate() error {
 	// Return an error if flush delay is zero
 	if conf.FlushDelay < 1 {
 		return errors.New("Improperly configured: specify a flush delay.")
+	}
+
+	// Return an error if anti-entropy delay is zero
+	if conf.AntiEntropyDelay < 1 {
+		return errors.New("Improperly configured: specify an anti-entropy delay.")
 	}
 
 	// Validate the LoggingConfig

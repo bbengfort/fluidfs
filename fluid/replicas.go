@@ -51,6 +51,7 @@ type Hosts struct {
 	Replicas map[string]*Replica // mapping of hostname to replica
 	Path     string              // path on disk where the hosts are stored
 	Updated  time.Time           // timestamp of the last update to the hosts table
+	names    []string            // list of hostnames (replica keys) for random selection.
 }
 
 //===========================================================================
@@ -87,7 +88,7 @@ func LocalReplica(name string, addr string, port uint, precedence uint) (*Replic
 	// Perform the precedence check
 	if precedence == 0 {
 		// Assign a random integer between 1 and 1000
-		precedence = uint(rand.Intn(1000))
+		precedence = uint(rand.Intn(1000)) + 1
 	}
 
 	replica := &Replica{
@@ -142,6 +143,9 @@ func (h *Hosts) Load(path string) error {
 	if err := yaml.Unmarshal(data, &replicas); err != nil {
 		return fmt.Errorf("could not unmarshal hosts: %s", err)
 	}
+
+	// Make the names slice to store keys
+	h.names = make([]string, 0, len(replicas))
 
 	// Load the Replicas into the mapping for quick lookup by Hostname.
 	for _, replica := range replicas {
@@ -242,6 +246,23 @@ func (h *Hosts) IsEmpty() bool {
 	return len(h.Replicas) == 0
 }
 
+// Random returns a random replica. Useful for anti-entropy replica selection.
+// If neighbor is true, then this function will not return the local host.
+func (h *Hosts) Random(neighbor bool) *Replica {
+	if len(h.names) < 2 {
+		return nil
+	}
+
+	idx := rand.Intn(len(h.names))
+	replica := h.Replicas[h.names[idx]]
+
+	if neighbor && replica == local {
+		return h.Random(neighbor)
+	}
+
+	return replica
+}
+
 // Has returns true if the replica name is part of the hosts collection.
 func (h *Hosts) Has(name string) bool {
 	_, ok := h.Replicas[name]
@@ -286,6 +307,9 @@ func (h *Hosts) Put(replica *Replica, save bool) error {
 	// Add the replica to the hosts mapping
 	h.Replicas[replica.Name] = replica
 
+	// Add the name to the names slice
+	h.names = append(h.names, replica.Name)
+
 	// Save the hosts to disk if required
 	if save {
 		return h.Save("")
@@ -302,8 +326,11 @@ func (h *Hosts) Delete(name string, save bool) error {
 		return nil
 	}
 
-	// Delete the replica
+	// Delete the replica from the map
 	delete(h.Replicas, name)
+
+	// Delete the replica name from the names slice
+	h.names = Remove(name, h.names)
 
 	// Save if needed
 	if save {
@@ -406,6 +433,11 @@ func (r *Replica) UpdateSent(amt uint64) {
 func (r *Replica) UpdateRecv(amt uint64) {
 	r.Recv += amt
 	r.Updated = time.Now()
+}
+
+// GetAddr returns a complete host/addr with the port number.
+func (r *Replica) GetAddr() string {
+	return fmt.Sprintf("%s:%d", r.Addr, r.Port)
 }
 
 // String returns the host/address representation of the replica.

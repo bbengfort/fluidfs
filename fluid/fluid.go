@@ -163,6 +163,9 @@ func Run() error {
 	// Run the Flusher
 	go Flusher(config.FlushDelay, echan)
 
+	// Run anti-entropy
+	go RunAntiEntropy(echan)
+
 	// Listen for an error from any of the go routines (also blocks)
 	// Log the error and shutdown gracefully (returning only shutdown errors).
 	err = <-echan

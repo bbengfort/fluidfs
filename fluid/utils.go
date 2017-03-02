@@ -74,6 +74,26 @@ func ListContains(value string, list []string) bool {
 	return false
 }
 
+// IndexOf searches a list for a particular value in O(n) time.
+func IndexOf(value string, list []string) int {
+	for pos, val := range list {
+		if val == value {
+			return pos
+		}
+	}
+	return -1
+}
+
+// Remove an element from a string collection
+func Remove(value string, list []string) []string {
+	idx := IndexOf(value, list)
+	if idx < 0 {
+		return list
+	}
+
+	return append(list[:idx], list[idx+1:]...)
+}
+
 //===========================================================================
 // Numeric Helpers
 //===========================================================================
