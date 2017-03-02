@@ -142,24 +142,21 @@ func (bdb *BoltDB) Batch(keys [][]byte, values [][]byte, bucket string) error {
 }
 
 // Scan a group of keys with a particular prefix using BoltDB prefix seek.
+// NOTE: this is dangerous thanks to the manual management of the transaction.
+// Avoid if possible until a better, non-racy solution can be found.
 func (bdb *BoltDB) Scan(prefix []byte, bucket string) Cursor {
-	cursor := &BoltCursor{
-		make(chan *KVPair), true, nil,
+	tx, err := bdb.db.Begin(false)
+	if err != nil {
+		return &BoltCursor{err: err}
 	}
 
-	go bdb.db.View(func(tx *bolt.Tx) error {
-		c := tx.Bucket([]byte(bucket)).Cursor()
+	b := tx.Bucket([]byte(bucket))
+	c := b.Cursor()
 
-		for k, v := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, v = c.Next() {
-			pair := &KVPair{k, v}
-			cursor.pairs <- pair
-		}
+	return &BoltCursor{
+		tx, b, c, true, nil, prefix, nil,
+	}
 
-		cursor.hasNext = false
-		return nil
-	})
-
-	return cursor
 }
 
 //===========================================================================
@@ -170,19 +167,38 @@ func (bdb *BoltDB) Scan(prefix []byte, bucket string) Cursor {
 // with a channel so that iteration can happen safely. This might not be the
 // fastest way to implement it, but it is the safest.
 type BoltCursor struct {
-	pairs   chan *KVPair // the channel to write pairs to.
-	hasNext bool         // whether or not the cursor has a next value.
-	err     error        // if there are any errors
+	tx     *bolt.Tx     // Hook to the transaction object to close it.
+	b      *bolt.Bucket // The bucket accessed by the transaction
+	c      *bolt.Cursor // The cursor on the bucket
+	seek   bool         // Whether or not we need to seek
+	pair   *KVPair      // The current k/v pair on the cursor
+	prefix []byte       // The prefix on the cursor
+	err    error        // Any errors encountered during processing.
 }
 
 // Next returns true if there is another key/value pair available.
 func (c *BoltCursor) Next() bool {
-	return c.hasNext
+	var k, v []byte
+	if c.seek {
+		k, v = c.c.Seek(c.prefix)
+		c.seek = false
+	} else {
+		k, v = c.c.Next()
+	}
+
+	if k != nil && bytes.HasPrefix(k, c.prefix) {
+		c.pair = &KVPair{k, v}
+		return true
+	}
+
+	c.err = c.tx.Rollback()
+	c.pair = nil
+	return false
 }
 
 // Pair returns the current key/value pair on the cursor.
 func (c *BoltCursor) Pair() *KVPair {
-	return <-c.pairs
+	return c.pair
 }
 
 // Error returns any errors from the database transaction.
