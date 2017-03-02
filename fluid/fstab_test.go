@@ -101,13 +101,29 @@ var _ = Describe("fstab", func() {
 		})
 
 		It("should be able to save a test fstab file", func() {
+			// Load some test data
 			inpath := filepath.Join("testdata", "fstab")
 			err := fstab.Load(inpath)
 			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 
+			// Save the fstab
 			outpath := filepath.Join(tmpDir, "fstab")
 			err = fstab.Save(outpath)
 			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
+
+			// Make sure the path exists
+			exists, err := pathExists(outpath)
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
+			Ω(exists).Should(BeTrue(), "no fstab at designated outpath")
+
+			// Load the data from the saved fstab
+			fstab2 := new(FSTable)
+			err = fstab2.Load(outpath)
+			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
+
+			// New fstab should be identical to old fstab
+			Ω(fstab.Updated).Should(BeTemporally("~", fstab2.Updated, time.Second))
+			Ω(fstab.Mounts).Should(Equal(fstab2.Mounts))
 		})
 
 	})

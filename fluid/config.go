@@ -6,18 +6,15 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"math/rand"
 	"os"
 	"os/user"
 	"path/filepath"
+	"time"
 
 	kvdb "github.com/bbengfort/fluidfs/fluid/db"
 
 	"gopkg.in/yaml.v2"
 )
-
-// DefaultPort that the replica listens on
-const DefaultPort = 4157
 
 // Configuration directories and fixtures
 const (
@@ -42,10 +39,9 @@ type Configuration interface {
 // from YAML configuration files and supplies the primary inputs to the
 // FluidFS server as well as connection interfaces to clients.
 type Config struct {
-	PID        uint            `yaml:"pid"`                   // Used to determine replica presidence
+	Seed       int64           `yaml:"seed,omitempty"`        // Control random number generation
 	Name       string          `yaml:"name,omitempty"`        // The name of the replica
-	Host       string          `yaml:"host,omitempty"`        // The listen address or host the replica
-	Port       int             `yaml:"port,omitempty"`        // The port the replica listens on
+	Hosts      string          `yaml:"hosts,omitempty"`       // The path to the hosts file on disk
 	FStab      string          `yaml:"fstab,omitempty"`       // The path to the fstab file on disk
 	FlushDelay int64           `yaml:"flush_delay,omitempty"` // Milliseconds to sleep betweeen flushes
 	Logging    *LoggingConfig  `yaml:"logging"`               // Configuration for logging
@@ -139,7 +135,7 @@ func (conf *Config) Read(path string) error {
 		return err
 	}
 
-	// Unmarshall the YAML data
+	// Unmarshal the YAML data
 	if err := yaml.Unmarshal(data, conf); err != nil {
 		return err
 	}
@@ -157,8 +153,8 @@ func (conf *Config) Read(path string) error {
 // Defaults sets the reasonable defaults on the Config object.
 func (conf *Config) Defaults() error {
 
-	// Select a random process id
-	conf.PID = uint(rand.Intn(1000))
+	// Set the random seed to a unix timestamp.
+	conf.Seed = time.Now().UnixNano()
 
 	// Get the Hostname
 	name, err := os.Hostname()
@@ -166,12 +162,11 @@ func (conf *Config) Defaults() error {
 		conf.Name = name
 	}
 
-	// Set the default Port
-	conf.Port = DefaultPort
-
+	// The default hosts path is in the user's hidden config directory: ~/.fluid/hosts
 	// The default fstab path is in the user's hidden config directory: ~/.fluid/fstab
 	usr, err := user.Current()
 	if err == nil {
+		conf.Hosts = filepath.Join(usr.HomeDir, HiddenConfigDirectory, "hosts")
 		conf.FStab = filepath.Join(usr.HomeDir, HiddenConfigDirectory, "fstab")
 	}
 
@@ -196,9 +191,9 @@ func (conf *Config) Defaults() error {
 // Validate ensures that required settings are correctly set.
 func (conf *Config) Validate() error {
 
-	// Return an error if there is no PID
-	if conf.PID == 0 {
-		return errors.New("Improperly configured: no precedence ID (pid) set.")
+	// Return an error if there is no seed
+	if conf.Seed == 0 {
+		return errors.New("Improperly configured: no random seed set.")
 	}
 
 	// Return an error if there is no replica name
@@ -256,7 +251,7 @@ func (conf *Config) Environ() error {
 
 // String returns a pretty representation of the Configuration.
 func (conf *Config) String() string {
-	output := fmt.Sprintf("%s configuration (%s:%d)", conf.Name, conf.Host, conf.Port)
+	output := fmt.Sprintf("%s configuration", conf.Name)
 	output += "\n" + conf.Database.String()
 	output += "\n" + conf.Storage.String()
 	output += "\n" + conf.Logging.String()

@@ -5,6 +5,7 @@ package fluid
 
 import (
 	"fmt"
+	"math/rand"
 
 	kvdb "github.com/bbengfort/fluidfs/fluid/db"
 )
@@ -21,6 +22,8 @@ var (
 	pid    *PID          // Process ID and C&C information
 	config *Config       // The application configuration
 	fstab  *FuseFSTable  // Mount Points and FS handling
+	hosts  *Hosts        // Describes members of the network
+	local  *Replica      // Describes the locally running Replica
 	logger *Logger       // Application logging and reporting
 	db     kvdb.Database // A connection to the database
 	web    *C2SAPI       // The listener for command and control.
@@ -73,6 +76,9 @@ func Init(conf string) error {
 		return err
 	}
 
+	// Set the random seed for things that require randomness.
+	rand.Seed(config.Seed)
+
 	// Load the logger from the logging configuration.
 	logger, err = InitLogger(config.Logging)
 	if err != nil {
@@ -87,13 +93,26 @@ func Init(conf string) error {
 	// Initialize the FSTable from the fstab path
 	fstab = new(FuseFSTable)
 	if err = fstab.Load(config.FStab); err != nil {
-		return err
+		return fmt.Errorf("could not load fstab: %s", err)
 	}
+
+	// Initialize the Hosts from the hosts path
+	hosts = new(Hosts)
+	if err = hosts.Load(config.Hosts); err != nil {
+		return fmt.Errorf("could not load hosts: %s", err)
+	}
+
+	// Initialize the local replica
+	local, err = hosts.Local()
+	if err != nil {
+		return fmt.Errorf("could not initialize local replica: %s", err)
+	}
+	logger.Info("local replica: %s with precedence %d", local, local.Precedence)
 
 	// Initialize the C2S API
 	web = new(C2SAPI)
 	if err = web.Init(); err != nil {
-		return err
+		return fmt.Errorf("could not initialize web api: %s", err)
 	}
 
 	return nil

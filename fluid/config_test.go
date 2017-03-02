@@ -59,10 +59,9 @@ var _ = Describe("Config", func() {
 			config := new(Config)
 
 			// Assert that the properties are all false
-			Ω(config.PID).Should(BeZero())
+			Ω(config.Seed).Should(BeZero())
 			Ω(config.Name).Should(BeZero())
-			Ω(config.Host).Should(BeZero())
-			Ω(config.Port).Should(BeZero())
+			Ω(config.Hosts).Should(BeZero())
 			Ω(config.FStab).Should(BeZero())
 			Ω(config.Logging).Should(BeZero())
 			Ω(config.Database).Should(BeZero())
@@ -72,8 +71,9 @@ var _ = Describe("Config", func() {
 			err := config.Defaults()
 			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 
+			Ω(config.Seed).ShouldNot(BeZero(), "no seed default")
 			Ω(config.Name).ShouldNot(BeZero(), "no name default")
-			Ω(config.Port).ShouldNot(BeZero(), "no port default")
+			Ω(config.Hosts).ShouldNot(BeZero(), "no hosts default")
 			Ω(config.FStab).ShouldNot(BeZero(), "no fstab default")
 			Ω(config.Logging).ShouldNot(BeZero(), "logging not defaulted")
 			Ω(config.Database).ShouldNot(BeZero(), "database not defaulted")
@@ -89,21 +89,19 @@ var _ = Describe("Config", func() {
 				config.Defaults()
 			})
 
-			It("should not allow a zero pid value", func() {
-				config.PID = 0
+			It("should not allow a zero seed value", func() {
+				config.Seed = 0
 				err := config.Validate()
-				Ω(err).Should(MatchError("Improperly configured: no precedence ID (pid) set."))
+				Ω(err).Should(MatchError("Improperly configured: no random seed set."))
 			})
 
 			It("should not allow a null hostname", func() {
-				config.PID = 1
 				config.Name = ""
 				err := config.Validate()
 				Ω(err).Should(MatchError("Improperly configured: a name is required."))
 			})
 
 			It("should not allow a null fstab", func() {
-				config.PID = 1
 				config.Name = "alaska"
 				config.FStab = ""
 				err := config.Validate()
@@ -111,7 +109,6 @@ var _ = Describe("Config", func() {
 			})
 
 			It("should validate the logging configuration", func() {
-				config.PID = 1
 				config.Name = "alaska"
 				config.Logging.Level = "KLONDIKE"
 				err := config.Validate()
@@ -119,7 +116,6 @@ var _ = Describe("Config", func() {
 			})
 
 			It("should validate the database configuration", func() {
-				config.PID = 1
 				config.Name = "alaska"
 				config.Database.Driver = "JunoDB"
 				err := config.Validate()
@@ -127,7 +123,6 @@ var _ = Describe("Config", func() {
 			})
 
 			It("should validate the chunking configuration", func() {
-				config.PID = 1
 				config.Name = "alaska"
 				config.Storage.Chunking = "cloudy"
 				err := config.Validate()

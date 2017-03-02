@@ -7,30 +7,30 @@
 #
 # Note is preferable to store configurations in ~/.fluidfs/config.yml
 
-# The process id (or precedence id) must be unique across all replicas and
-# determines presidence during version conflicts. If commented out, the
-# replica will select a random number between 1 and 1000.
-pid: 0
+# Randomness is an important part of distributed operation, used to select
+# precedence or to create election timeouts. To control the pseudo-random
+# number generation, you may set a seed, but leave commented out to use a
+# seed value that is based on the timestamp of initialization.
+# seed: 42
 
 # The replica name (must be unique), usually the hostname of the device.
 # Note if Name is null it will be set to the hostname of the device.
 # name: null
 
-# The IP address or hostname of the replica to listen for connections on.
-# Note that this must be a well formed IP address, but should not contain a
-# port number suffixed to the address. If null is supplied then FluidFS will
-# do its best to detect the external IP address of the machine and use that.
-# host: null
-
-# The port to listen on, the default port is 4157.
-port: 4157
+# The path to the hosts file that configures the replica network. If null or
+# omitted, the hosts file will be created at ~/.fluid/hosts and will be loaded
+# with the localhost's IP address and information. This isn't a very
+# interesting network, but the hosts will be populated if it receives
+# communication from any other replica, meaning that hosts only has to be
+# defined on at least one replica.
+# hosts: null
 
 # The path to the fstab file that configures mount points. If null or omitted,
 # the fstab file will be created at ~/.fluid/fstab. The fstab file can be
 # modified by both the application and the user, but with care.
 # fstab: null
 
-# The delay in milliseconds to flush the metadata in the file system. If null 
+# The delay in milliseconds to flush the metadata in the file system. If null
 # or omitted the default flush delay is 750 milliseconds.
 # flush_delay: 750
 

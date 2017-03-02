@@ -10,7 +10,7 @@ import "fmt"
 
 // NewVersion creates a new version sequence with the local precedence ID.
 func NewVersion() *Version {
-	return &Version{config.PID, 0, 0}
+	return &Version{local.Precedence, 0, 0}
 }
 
 // Version implements a Lamport scalar version number that has two components:

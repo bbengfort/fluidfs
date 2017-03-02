@@ -299,7 +299,7 @@ func (f *File) Flush(ctx context.Context, req *fuse.FlushRequest) error {
 	// TODO: what if there is a name conflict at root?
 	logger.Warn("before version bump node %d: %s is %s -> %s", f.ID, f.Name, f.Previous, f.Version)
 	f.Previous = f.Version
-	f.Version = f.Version.Next(config.PID)
+	f.Version = f.Version.Next(local.Precedence)
 	logger.Warn("updated %s version from %s to %s", f.Name, f.Previous, f.Version)
 
 	// NOTE: Store both the data and the meta data to disk.
