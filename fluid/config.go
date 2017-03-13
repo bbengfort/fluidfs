@@ -3,7 +3,6 @@
 package fluid
 
 import (
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -197,27 +196,27 @@ func (conf *Config) Validate() error {
 
 	// Return an error if there is no seed
 	if conf.Seed == 0 {
-		return errors.New("Improperly configured: no random seed set.")
+		return ImproperlyConfigured("no random seed set.")
 	}
 
 	// Return an error if there is no replica name
 	if conf.Name == "" {
-		return errors.New("Improperly configured: a name is required.")
+		return ImproperlyConfigured("a name is required.")
 	}
 
 	// Return an error if there is no fstab path
 	if conf.FStab == "" {
-		return errors.New("Improperly configured: an fstab path is required.")
+		return ImproperlyConfigured("an fstab path is required.")
 	}
 
 	// Return an error if flush delay is zero
 	if conf.FlushDelay < 1 {
-		return errors.New("Improperly configured: specify a flush delay.")
+		return ImproperlyConfigured("specify a flush delay.")
 	}
 
 	// Return an error if anti-entropy delay is zero
 	if conf.AntiEntropyDelay < 1 {
-		return errors.New("Improperly configured: specify an anti-entropy delay.")
+		return ImproperlyConfigured("specify an anti-entropy delay.")
 	}
 
 	// Validate the LoggingConfig
@@ -290,8 +289,7 @@ func (conf *LoggingConfig) Validate() error {
 
 	// Return an error if the log level is incorrect.
 	if !ListContains(conf.Level, levelNames) {
-		msg := "Improperly Configured: '%s' is not a valid log level."
-		return fmt.Errorf(msg, conf.Level)
+		return ImproperlyConfigured("'%s' is not a valid log level.", conf.Level)
 	}
 
 	return nil
@@ -349,12 +347,12 @@ func (conf *DatabaseConfig) Validate() error {
 
 	// Ensure that the driver is in the list of drivers.
 	if !ListContains(conf.Driver, kvdb.DriverNames) {
-		return fmt.Errorf("Improperly configured: '%s' is not a valid database driver", conf.Driver)
+		return ImproperlyConfigured("'%s' is not a valid database driver", conf.Driver)
 	}
 
 	// Ensure that a path has been passed in.
 	if conf.Path == "" {
-		return errors.New("Improperly configured: must specify a path to the database")
+		return ImproperlyConfigured("must specify a path to the database")
 	}
 
 	return nil
@@ -429,7 +427,7 @@ func (conf *StorageConfig) Validate() error {
 
 	// Return an error if there is no storage path
 	if conf.Path == "" {
-		return errors.New("Improperly configured: a path to the storage directory is required.")
+		return ImproperlyConfigured("a path to the storage directory is required.")
 	}
 
 	// NOTE: The following happens in validate, e.g. ASAP so that errors happen at startup.
@@ -438,14 +436,14 @@ func (conf *StorageConfig) Validate() error {
 	// has permission to read and write to the directory.
 	if _, err := os.Stat(conf.Path); os.IsNotExist(err) {
 		if err := os.MkdirAll(conf.Path, ModeStorageDir); err != nil {
-			return fmt.Errorf("Improperly configured: could not create storage directory at '%s'", conf.Path)
+			return ImproperlyConfigured("could not create storage directory at '%s'", conf.Path)
 		}
 	}
 
 	// Ensure that the storage path is a directory just in case.
 	info, _ := os.Stat(conf.Path)
 	if !info.Mode().IsDir() {
-		return errors.New("Improperly configured: storage directory cannot be accessed.")
+		return ImproperlyConfigured("storage directory cannot be accessed.")
 	}
 
 	// Ensure that the chunks is all lowercase and whitespace trimmed.
@@ -453,22 +451,22 @@ func (conf *StorageConfig) Validate() error {
 
 	// Ensure that the chunking method is in the list of available methods.
 	if !ListContains(conf.Chunking, chunkingMethodNames) {
-		return fmt.Errorf("Improperly configured: '%s' is not a valid chunking mechanism", conf.Chunking)
+		return ImproperlyConfigured("'%s' is not a valid chunking mechanism", conf.Chunking)
 	}
 
 	// Ensure that the block size is greater than zero.
 	if conf.BlockSize < 1 {
-		return errors.New("Improperly configured: must specify a block size greater than 0 bytes.")
+		return ImproperlyConfigured("must specify a block size greater than 0 bytes.")
 	}
 
 	// Ensure that MaxBlockSize is greater than target and minimum.
 	if conf.MaxBlockSize < conf.BlockSize || conf.MaxBlockSize < conf.MinBlockSize {
-		return errors.New("Improperly configured: maximum block size must be greater than or equal target and minimum block sizes.")
+		return ImproperlyConfigured("maximum block size must be greater than or equal target and minimum block sizes.")
 	}
 
 	// Ensure that MinBlockSize is less than the target and maximum.
 	if conf.MinBlockSize > conf.BlockSize || conf.MinBlockSize > conf.MaxBlockSize {
-		return errors.New("Improperly configured: minimum block size must be less than or equal to the target block size.")
+		return ImproperlyConfigured("minimum block size must be less than or equal to the target block size.")
 	}
 
 	// Ensure that hashing is all lowercase and whitespace trimmed.
@@ -476,7 +474,7 @@ func (conf *StorageConfig) Validate() error {
 
 	// Ensure that the hashing algorithm is in the list of available algorithms.
 	if !ListContains(conf.Hashing, hashingAlgorithmNames) {
-		return fmt.Errorf("Improperly configured: '%s' is not a valid hashing algorithm", conf.Hashing)
+		return ImproperlyConfigured("'%s' is not a valid hashing algorithm", conf.Hashing)
 	}
 
 	return nil

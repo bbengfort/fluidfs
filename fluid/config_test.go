@@ -92,12 +92,16 @@ var _ = Describe("Config", func() {
 			It("should not allow a zero seed value", func() {
 				config.Seed = 0
 				err := config.Validate()
+				Ω(err).Should(HaveOccurred())
+				Ω(err.(*Error).Code).Should(Equal(ErrImproperlyConfigured))
 				Ω(err).Should(MatchError("Improperly configured: no random seed set."))
 			})
 
 			It("should not allow a null hostname", func() {
 				config.Name = ""
 				err := config.Validate()
+				Ω(err).Should(HaveOccurred())
+				Ω(err.(*Error).Code).Should(Equal(ErrImproperlyConfigured))
 				Ω(err).Should(MatchError("Improperly configured: a name is required."))
 			})
 
@@ -105,6 +109,8 @@ var _ = Describe("Config", func() {
 				config.Name = "alaska"
 				config.FStab = ""
 				err := config.Validate()
+				Ω(err).Should(HaveOccurred())
+				Ω(err.(*Error).Code).Should(Equal(ErrImproperlyConfigured))
 				Ω(err).Should(MatchError("Improperly configured: an fstab path is required."))
 			})
 
@@ -113,6 +119,7 @@ var _ = Describe("Config", func() {
 				config.Logging.Level = "KLONDIKE"
 				err := config.Validate()
 				Ω(err).Should(HaveOccurred())
+				Ω(err.(*Error).Code).Should(Equal(ErrImproperlyConfigured))
 			})
 
 			It("should validate the database configuration", func() {
@@ -120,6 +127,7 @@ var _ = Describe("Config", func() {
 				config.Database.Driver = "JunoDB"
 				err := config.Validate()
 				Ω(err).Should(HaveOccurred())
+				Ω(err.(*Error).Code).Should(Equal(ErrImproperlyConfigured))
 			})
 
 			It("should validate the chunking configuration", func() {
@@ -127,6 +135,7 @@ var _ = Describe("Config", func() {
 				config.Storage.Chunking = "cloudy"
 				err := config.Validate()
 				Ω(err).Should(HaveOccurred())
+				Ω(err.(*Error).Code).Should(Equal(ErrImproperlyConfigured))
 			})
 
 		})
@@ -159,7 +168,9 @@ var _ = Describe("Config", func() {
 			It("should not allow bad logging levels", func() {
 				config.Level = "KODIAC"
 				err := config.Validate()
-				Ω(err).Should(MatchError("Improperly Configured: 'KODIAC' is not a valid log level."))
+				Ω(err).Should(HaveOccurred())
+				Ω(err.(*Error).Code).Should(Equal(ErrImproperlyConfigured))
+				Ω(err).Should(MatchError("Improperly configured: 'KODIAC' is not a valid log level."))
 			})
 
 			It("should allow good logging levels", func() {
@@ -206,6 +217,8 @@ var _ = Describe("Config", func() {
 			It("should not allow bad database drivers", func() {
 				config.Driver = "KODIAC"
 				err := config.Validate()
+				Ω(err).Should(HaveOccurred())
+				Ω(err.(*Error).Code).Should(Equal(ErrImproperlyConfigured))
 				Ω(err).Should(MatchError("Improperly configured: 'kodiac' is not a valid database driver"))
 			})
 
@@ -248,7 +261,10 @@ var _ = Describe("Config", func() {
 
 			It("should not allow zero database paths", func() {
 				config.Path = ""
-				Ω(config.Validate()).Should(MatchError("Improperly configured: must specify a path to the database"))
+				err := config.Validate()
+				Ω(err).Should(HaveOccurred())
+				Ω(err.(*Error).Code).Should(Equal(ErrImproperlyConfigured))
+				Ω(err).Should(MatchError("Improperly configured: must specify a path to the database"))
 			})
 
 		})
@@ -297,7 +313,10 @@ var _ = Describe("Config", func() {
 
 			It("should not allow zero storage paths", func() {
 				config.Path = ""
-				Ω(config.Validate()).Should(MatchError("Improperly configured: a path to the storage directory is required."))
+				err = config.Validate()
+				Ω(err).Should(HaveOccurred())
+				Ω(err.(*Error).Code).Should(Equal(ErrImproperlyConfigured))
+				Ω(err).Should(MatchError("Improperly configured: a path to the storage directory is required."))
 			})
 
 			It("should create the storage directory immediately", func() {
@@ -317,6 +336,8 @@ var _ = Describe("Config", func() {
 			It("should not allow bad chunking mechanisms", func() {
 				config.Chunking = "cloudy"
 				err := config.Validate()
+				Ω(err).Should(HaveOccurred())
+				Ω(err.(*Error).Code).Should(Equal(ErrImproperlyConfigured))
 				Ω(err).Should(MatchError("Improperly configured: 'cloudy' is not a valid chunking mechanism"))
 			})
 
@@ -361,6 +382,8 @@ var _ = Describe("Config", func() {
 				config.MinBlockSize = 0
 				config.BlockSize = 0
 				err := config.Validate()
+				Ω(err).Should(HaveOccurred())
+				Ω(err.(*Error).Code).Should(Equal(ErrImproperlyConfigured))
 				Ω(err).Should(MatchError("Improperly configured: must specify a block size greater than 0 bytes."))
 
 				config.MinBlockSize = 10
@@ -371,6 +394,8 @@ var _ = Describe("Config", func() {
 				config.MinBlockSize = -1
 				config.BlockSize = -1
 				err = config.Validate()
+				Ω(err).Should(HaveOccurred())
+				Ω(err.(*Error).Code).Should(Equal(ErrImproperlyConfigured))
 				Ω(err).Should(MatchError("Improperly configured: must specify a block size greater than 0 bytes."))
 			})
 
@@ -378,6 +403,8 @@ var _ = Describe("Config", func() {
 				config.MaxBlockSize = 10
 				config.BlockSize = 1000
 				err := config.Validate()
+				Ω(err).Should(HaveOccurred())
+				Ω(err.(*Error).Code).Should(Equal(ErrImproperlyConfigured))
 				Ω(err).Should(MatchError("Improperly configured: maximum block size must be greater than or equal target and minimum block sizes."))
 
 			})
@@ -387,6 +414,8 @@ var _ = Describe("Config", func() {
 				config.MinBlockSize = 1000
 				config.BlockSize = 2000
 				err := config.Validate()
+				Ω(err).Should(HaveOccurred())
+				Ω(err.(*Error).Code).Should(Equal(ErrImproperlyConfigured))
 				Ω(err).Should(MatchError("Improperly configured: maximum block size must be greater than or equal target and minimum block sizes."))
 
 			})
@@ -395,6 +424,8 @@ var _ = Describe("Config", func() {
 				config.MinBlockSize = 1000
 				config.BlockSize = 100
 				err := config.Validate()
+				Ω(err).Should(HaveOccurred())
+				Ω(err.(*Error).Code).Should(Equal(ErrImproperlyConfigured))
 				Ω(err).Should(MatchError("Improperly configured: minimum block size must be less than or equal to the target block size."))
 
 			})
@@ -402,6 +433,8 @@ var _ = Describe("Config", func() {
 			It("should not allow bad hashing alogrithms", func() {
 				config.Hashing = "protobob"
 				err := config.Validate()
+				Ω(err).Should(HaveOccurred())
+				Ω(err.(*Error).Code).Should(Equal(ErrImproperlyConfigured))
 				Ω(err).Should(MatchError("Improperly configured: 'protobob' is not a valid hashing algorithm"))
 			})
 
