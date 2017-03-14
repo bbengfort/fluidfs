@@ -6,7 +6,6 @@ package fluid
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -76,7 +75,7 @@ func (api *C2SAPI) Init() error {
 }
 
 // Run the API at the specified address.
-func (api *C2SAPI) Run(addr string, echan chan error) {
+func (api *C2SAPI) Run(addr string, echan chan<- error) {
 
 	// Create the HTTP server
 	srv := &http.Server{
@@ -162,32 +161,32 @@ func (api *C2SAPI) MountHandler(r *http.Request) (int, JSON, error) {
 
 	// Validate the passed in arguments
 	if path, ok = req["path"].(string); !ok {
-		return http.StatusBadRequest, nil, errors.New("missing required path argument")
+		return http.StatusBadRequest, nil, Errors("missing required path argument")
 	}
 
 	if prefix, ok = req["prefix"].(string); !ok {
-		return http.StatusBadRequest, nil, errors.New("missing required prefix argument")
+		return http.StatusBadRequest, nil, Errors("missing required prefix argument")
 	}
 
 	if uid, ok = req["uid"].(float64); !ok {
-		return http.StatusBadRequest, nil, errors.New("missing required uid argument")
+		return http.StatusBadRequest, nil, Errors("missing required uid argument")
 	}
 
 	if gid, ok = req["gid"].(float64); !ok {
-		return http.StatusBadRequest, nil, errors.New("missing required gid argument")
+		return http.StatusBadRequest, nil, Errors("missing required gid argument")
 	}
 
 	info, err := os.Stat(path)
 	if os.IsNotExist(err) {
-		return http.StatusBadRequest, nil, fmt.Errorf("mount path '%s' does not exist", path)
+		return http.StatusBadRequest, nil, Errorsf("mount path '%s' does not exist", path)
 	}
 
 	if !info.IsDir() {
-		return http.StatusBadRequest, nil, fmt.Errorf("mount path '%s' is not a directory", path)
+		return http.StatusBadRequest, nil, Errorsf("mount path '%s' is not a directory", path)
 	}
 
 	if strings.HasPrefix(prefix, "/") {
-		return http.StatusBadRequest, nil, errors.New("prefix cannot start with '/'")
+		return http.StatusBadRequest, nil, Errors("prefix cannot start with '/'")
 	}
 
 	// Create the mount point now that we've validated it (more or less)

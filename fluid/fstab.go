@@ -7,7 +7,6 @@ package fluid
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -111,12 +110,12 @@ func (mp *MountPoint) Parse(line string) error {
 	fields := strings.Fields(line)
 
 	if len(fields) != 8 {
-		return errors.New("could not parse mount point: not enough fields")
+		return Errorc("could not parse mount point: not enough fields", ErrParsing)
 	}
 
 	// Parse the UUID
 	if mp.UUID, err = uuid.Parse(fields[0]); err != nil {
-		return fmt.Errorf("could not parse UUID field: %s", err.Error())
+		return ParsingError("could not parse UUID field", err)
 	}
 
 	// Set the mount point path and prefix strings
@@ -126,13 +125,13 @@ func (mp *MountPoint) Parse(line string) error {
 	// Parse the UID and GID integers
 	uid, err := strconv.ParseUint(fields[3], 10, 32)
 	if err != nil {
-		return fmt.Errorf("could not parse UID field: %s", err.Error())
+		return ParsingError("could not parse UID field", err)
 	}
 	mp.UID = uint32(uid)
 
 	gid, err := strconv.ParseUint(fields[4], 10, 32)
 	if err != nil {
-		return fmt.Errorf("could not parse GID field: %s", err.Error())
+		return ParsingError("could not parse GID field", err)
 	}
 	mp.GID = uint32(gid)
 
@@ -142,11 +141,11 @@ func (mp *MountPoint) Parse(line string) error {
 
 	// Parse the Store and Replicate Boolean values
 	if mp.Store, err = strconv.ParseBool(fields[6]); err != nil {
-		return fmt.Errorf("could not parse Store field: %s", err.Error())
+		return ParsingError("could not parse Store field", err)
 	}
 
 	if mp.Replicate, err = strconv.ParseBool(fields[7]); err != nil {
-		return fmt.Errorf("could not parse Replicate field: %s", err.Error())
+		return ParsingError("could not parse Replicate field", err)
 	}
 
 	return nil
@@ -272,7 +271,7 @@ func (fstab *FSTable) Load(path string) error {
 	// Open the fstab file for reading
 	fobj, err := os.Open(path)
 	if err != nil {
-		return fmt.Errorf("could not open the fstab for reading: %s", err.Error())
+		return WrapError("could not open the fstab for reading", ErrFluidExit, "", err)
 	}
 
 	// Ensure the file will be closed at the end
@@ -301,7 +300,7 @@ func (fstab *FSTable) Load(path string) error {
 				// Parse the date if possible
 				date, err := time.Parse(fstabUpdateDate, strings.TrimSpace(sub[1]))
 				if err != nil {
-					return fmt.Errorf("could not parse update line: %s", err.Error())
+					return ParsingError("could not parse update line", err)
 				}
 
 				// Set the updated time stamp.
@@ -333,7 +332,7 @@ func (fstab *FSTable) Load(path string) error {
 
 	// If there is a scanning error, return it
 	if err := scanner.Err(); err != nil {
-		return fmt.Errorf("could not open the fstab for reading: %s", err.Error())
+		return WrapError("could not open the fstab for reading", ErrFluidExit, "", err)
 	}
 
 	return nil
@@ -402,7 +401,7 @@ func (fstab *FSTable) Status() string {
 //===========================================================================
 
 // Run a FileSystem on all MountPoints
-func (fs *FuseFSTable) Run(echan chan error) error {
+func (fs *FuseFSTable) Run(echan chan<- error) error {
 	// Make the FuseFS File system list
 	fs.FuseFS = make([]*FileSystem, len(fs.Mounts))
 

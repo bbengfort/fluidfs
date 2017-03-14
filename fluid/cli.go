@@ -5,7 +5,6 @@ package fluid
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -35,7 +34,7 @@ func (c *CLIClient) Init() error {
 	// Load the PID file to detect the location to query the web service.
 	c.PID = new(PID)
 	if err := c.PID.Load(); err != nil {
-		return errors.New("Could not connect to the FluidFS server: no PID file detected.")
+		return Errors("Could not connect to the FluidFS server: no PID file detected.")
 	}
 
 	// Create an HTTP client with a 30 second timeout.
@@ -82,7 +81,7 @@ func (c *CLIClient) Mount(path string, prefix string) error {
 
 	res, err := c.Post(MountEndpoint, data)
 	if err != nil {
-		return fmt.Errorf("could not post request to fluidfs: %s", err.Error())
+		return APIAccessError("could not post request to fluidfs: %s", err)
 	}
 
 	mp := res["mount"].(string)
@@ -106,7 +105,8 @@ func (c *CLIClient) Web() error {
 	case "windows", "darwin":
 		err = exec.Command("open", addr).Start()
 	default:
-		err = fmt.Errorf("unsupported platform: %s", runtime.GOOS)
+		msg := fmt.Sprintf("unsupported platform: %s", runtime.GOOS)
+		err = Errorc(msg, ErrUnsupported)
 	}
 
 	if err != nil {
@@ -182,10 +182,10 @@ func (c *CLIClient) Get(resource string, detail ...string) (JSON, error) {
 	if res.StatusCode != http.StatusOK {
 		msg, ok := data["error"].(string)
 		if ok {
-			return data, errors.New(msg)
+			return data, Errors(msg)
 		}
 
-		return data, errors.New(res.Status)
+		return data, Errors(res.Status)
 	}
 
 	return data, nil
@@ -229,10 +229,10 @@ func (c *CLIClient) Post(resource string, data JSON, detail ...string) (JSON, er
 	if res.StatusCode != http.StatusOK {
 		msg, ok := resData["error"].(string)
 		if ok {
-			return resData, errors.New(msg)
+			return resData, Errors(msg)
 		}
 
-		return resData, errors.New(res.Status)
+		return resData, Errors(res.Status)
 	}
 
 	return resData, nil

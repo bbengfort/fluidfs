@@ -8,8 +8,6 @@ import (
 	"crypto/sha1"
 	"crypto/sha256"
 	"encoding/base64"
-	"errors"
-	"fmt"
 	"hash"
 	"io"
 	"io/ioutil"
@@ -131,7 +129,7 @@ func NewChunker(data []byte, config *StorageConfig) (Chunker, error) {
 			maxBlockSize: uint64(config.MaxBlockSize),
 		}
 	default:
-		return nil, fmt.Errorf("unknown chunking method: '%s'", config.Chunking)
+		return nil, ChunkingError("'%s' is an unknown chunking method", config.Chunking)
 	}
 
 	// Initialize a new hasher to uniquely identify chunks (blobs).
@@ -152,7 +150,7 @@ func NewChunker(data []byte, config *StorageConfig) (Chunker, error) {
 // NewDefaultChunker creates a chunker using the global StorageConfig.
 func NewDefaultChunker(data []byte) (Chunker, error) {
 	if config == nil || config.Storage == nil {
-		return nil, errors.New("the default storage configuration isn't initialized")
+		return nil, Errorc("the default storage configuration isn't initialized", ErrUninitialized)
 	}
 
 	return NewChunker(data, config.Storage)
@@ -178,7 +176,7 @@ func CreateHasher(name string) (func() hash.Hash, error) {
 			return murmur3.New128()
 		}, nil
 	default:
-		return nil, fmt.Errorf("unknown hashing algorithm: '%s'", name)
+		return nil, ChunkingError("'%s' is not a known hashing algorithm", name)
 	}
 }
 

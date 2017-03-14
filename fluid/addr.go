@@ -1,10 +1,6 @@
 package fluid
 
-import (
-	"errors"
-	"fmt"
-	"net"
-)
+import "net"
 
 // ExternalIP looks up an the first available external IP address. It is used
 // by the LocalReplica function to automatically instantiate a local node.
@@ -13,7 +9,7 @@ func ExternalIP() (string, error) {
 	// Get addresses for the interface
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {
-		return "", fmt.Errorf("could not get interface addresses: %s", err.Error())
+		return "", NetworkError("could not get interface addresses", err)
 	}
 
 	// Go through each address to find a an IPv4
@@ -40,7 +36,7 @@ func ExternalIP() (string, error) {
 		return ip.String(), nil
 	}
 
-	return "", errors.New("could not get external addr, requires network connection")
+	return "", NetworkError("could not get external addr, requires network connection", nil)
 }
 
 // ResolveAddr accepts an address as a string and if the IP address is missing
@@ -51,7 +47,7 @@ func ResolveAddr(addr string) (string, error) {
 
 	tcpAddr, err := net.ResolveTCPAddr("tcp", addr)
 	if err != nil {
-		return "", fmt.Errorf("could not resolve address: %s", err.Error())
+		return "", NetworkError("could not resolve address", err)
 	}
 
 	if tcpAddr.IP == nil {

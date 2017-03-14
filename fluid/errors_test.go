@@ -11,6 +11,12 @@ import (
 
 var _ = Describe("Errors", func() {
 
+	It("should always supply the default error", func() {
+		err := NewError("something bad happened", 0, "")
+		Ω(err.(*Error).Code).ShouldNot(Equal(0))
+		Ω(err.(*Error).Code).Should(Equal(ErrFluidExit))
+	})
+
 	It("should create an error with formatting", func() {
 		err := Errorf("this is test %d with %s", 0, "", 8, "aplomb")
 		Ω(err.Error()).Should(Equal("this is test 8 with aplomb"))

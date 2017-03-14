@@ -5,24 +5,49 @@ import "fmt"
 // Error codes for various FluidFS error handling requirements
 const (
 	_                       = iota // Ignore Zero error codes
+	ErrFluidExit                   // FluidFS must exit (default error)
 	ErrNotImplemented              // Feature is not currently implemented
 	ErrImproperlyConfigured        // Configuration error or missing value
+	ErrNetworkUnavailable          // Cannot reach network interface
+	ErrUninitialized               // A required component is not initialized correctly
+	ErrChunking                    // Something went wrong during chunking
 )
 
 //===========================================================================
 // Error Functions
 //===========================================================================
 
+// NewError creates a new simple error with the given code and prefix.
+func NewError(message string, code int, prefix string) error {
+	// Set the default error code
+	if code == 0 {
+		code = ErrFluidExit
+	}
+
+	// Create the error and return
+	return &Error{
+		Code:    code,
+		Prefix:  prefix,
+		Message: message,
+		err:     nil,
+	}
+}
+
+// Errorc creates a simple error with the given code and no prefix.
+func Errorc(message string, code int) error {
+	return NewError(message, code, "")
+}
+
+// Errors creates a simple error with the default code and no prefix.
+func Errors(message string) error {
+	return Errorc(message, ErrFluidExit)
+}
+
 // Errorf creates an error with the given code, prefix, and message but also
 // performs some string formatting on behalf of the user (similar to the
 // fmt.Errorf function, but with codes and prefixes).
 func Errorf(message string, code int, prefix string, args ...interface{}) error {
-	return &Error{
-		Code:    code,
-		Prefix:  prefix,
-		Message: fmt.Sprintf(message, args...),
-		err:     nil,
-	}
+	return NewError(fmt.Sprintf(message, args...), code, prefix)
 }
 
 // WrapError calls Errorf, but also includes the wrapped error in the return.
@@ -35,6 +60,16 @@ func WrapError(message string, code int, prefix string, err error, args ...inter
 // ImproperlyConfigured creates a new ErrImproperlyConfigured error.
 func ImproperlyConfigured(message string, args ...interface{}) error {
 	return Errorf(message, ErrImproperlyConfigured, "Improperly configured: ", args...)
+}
+
+// NetworkError creates a new ErrNetworkUnavailable error.
+func NetworkError(message string, err error, args ...interface{}) error {
+	return WrapError(message, ErrNetworkUnavailable, "Network unavailable: ", err, args...)
+}
+
+// ChunkingError creates a new ErrChunking error.
+func ChunkingError(message string, args ...interface{}) error {
+	return Errorf(message, ErrChunking, "", args...)
 }
 
 //===========================================================================
