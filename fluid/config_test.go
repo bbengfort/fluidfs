@@ -66,6 +66,7 @@ var _ = Describe("Config", func() {
 			Ω(config.Logging).Should(BeZero())
 			Ω(config.Database).Should(BeZero())
 			Ω(config.Storage).Should(BeZero())
+			Ω(config.Security).Should(BeZero())
 
 			// Run the defaults and assert that default values are set.
 			err := config.Defaults()
@@ -78,6 +79,7 @@ var _ = Describe("Config", func() {
 			Ω(config.Logging).ShouldNot(BeZero(), "logging not defaulted")
 			Ω(config.Database).ShouldNot(BeZero(), "database not defaulted")
 			Ω(config.Storage).ShouldNot(BeZero(), "storage not defaulted")
+			Ω(config.Security).ShouldNot(BeZero(), "security not defaulted")
 		})
 
 		Context("validation after defaults", func() {
@@ -133,6 +135,15 @@ var _ = Describe("Config", func() {
 			It("should validate the chunking configuration", func() {
 				config.Name = "alaska"
 				config.Storage.Chunking = "cloudy"
+				err := config.Validate()
+				Ω(err).Should(HaveOccurred())
+				Ω(err.(*Error).Code).Should(Equal(ErrImproperlyConfigured))
+			})
+
+			It("should validate the security configuration", func() {
+				config.Name = "alaska"
+				config.Security.Insecure = false
+				config.Security.Key = ""
 				err := config.Validate()
 				Ω(err).Should(HaveOccurred())
 				Ω(err.(*Error).Code).Should(Equal(ErrImproperlyConfigured))
@@ -473,6 +484,211 @@ var _ = Describe("Config", func() {
 					err := config.Validate()
 					Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 				}
+			})
+
+		})
+
+	})
+
+	Describe("security configuration interface", func() {
+
+		It("should load defaults when called", func() {
+			config := new(SecurityConfig)
+
+			// Assert that config has zero values
+			Ω(config.Insecure).Should(BeZero())
+			Ω(config.VerifyClient).Should(BeZero())
+			Ω(config.Key).Should(BeZero())
+			Ω(config.Cert).Should(BeZero())
+			Ω(config.CA).Should(BeZero())
+
+			// Call defaults and assert default values
+			config.Defaults()
+			Ω(config.Insecure).Should(BeFalse())
+			Ω(config.VerifyClient).Should(BeTrue())
+			Ω(config.Key).ShouldNot(BeZero())
+			Ω(config.Cert).ShouldNot(BeZero())
+			Ω(config.CA).ShouldNot(BeZero())
+		})
+
+		Context("validation after defaults", func() {
+
+			var config *SecurityConfig
+
+			BeforeEach(func() {
+				config = new(SecurityConfig)
+				config.Defaults()
+			})
+
+			Context("insecure defaults", func() {
+
+				BeforeEach(func() {
+					config.Insecure = true
+				})
+
+				It("should not raise path exception for the key", func() {
+					config.Key = ""
+					err := config.Validate()
+					Ω(err).ShouldNot(HaveOccurred())
+				})
+
+				It("should not raise path exception for the cert", func() {
+					config.Cert = ""
+					err := config.Validate()
+					Ω(err).ShouldNot(HaveOccurred())
+				})
+
+				It("should not raise path exception for the ca", func() {
+					config.CA = ""
+					err := config.Validate()
+					Ω(err).ShouldNot(HaveOccurred())
+				})
+
+			})
+
+			Context("with security files on disk", func() {
+
+				var err error
+				var tmpDir string
+				var keyFile string
+				var certFile string
+				var caFile string
+
+				BeforeEach(func() {
+					tmpDir, err = ioutil.TempDir("", TempDirPrefix)
+					Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
+
+					keyFile = filepath.Join(tmpDir, "replica.key")
+					certFile = filepath.Join(tmpDir, "replica.crt")
+					caFile = filepath.Join(tmpDir, "ca.crt")
+
+					Ω(ioutil.WriteFile(keyFile, []byte("key"), 0600)).ShouldNot(HaveOccurred())
+					Ω(ioutil.WriteFile(certFile, []byte("crt"), 0600)).ShouldNot(HaveOccurred())
+					Ω(ioutil.WriteFile(caFile, []byte("ca"), 0600)).ShouldNot(HaveOccurred())
+				})
+
+				AfterEach(func() {
+					err = os.RemoveAll(tmpDir)
+					Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
+				})
+
+				Context("secure without client verification defaults", func() {
+
+					BeforeEach(func() {
+						config.Insecure = false
+						config.VerifyClient = false
+					})
+
+					It("should raise missing key exception", func() {
+						config.Key = ""
+						err := config.Validate()
+						Ω(err).Should(HaveOccurred())
+						Ω(err.(*Error).Code).Should(Equal(ErrImproperlyConfigured))
+						Ω(err).Should(MatchError("Improperly configured: private key and certificate required for secure operation"))
+					})
+
+					It("should raise a could not find key error", func() {
+						config.Key = filepath.Join(tmpDir, "not-a-real.key")
+						err := config.Validate()
+						Ω(err).Should(HaveOccurred())
+						Ω(err.(*Error).Code).Should(Equal(ErrImproperlyConfigured))
+						Ω(err).Should(MatchError(MatchRegexp("Improperly configured: could not find private key file at .*")))
+					})
+
+					It("should raise missing certificate exception", func() {
+						config.Key = keyFile
+						config.Cert = ""
+						err := config.Validate()
+						Ω(err).Should(HaveOccurred())
+						Ω(err.(*Error).Code).Should(Equal(ErrImproperlyConfigured))
+						Ω(err).Should(MatchError("Improperly configured: private key and certificate required for secure operation"))
+					})
+
+					It("should raise could not find certificate error", func() {
+						config.Key = keyFile
+						config.Cert = filepath.Join(tmpDir, "not-a-real.crt")
+						err := config.Validate()
+						Ω(err).Should(HaveOccurred())
+						Ω(err.(*Error).Code).Should(Equal(ErrImproperlyConfigured))
+						Ω(err).Should(MatchError(MatchRegexp("Improperly configured: could not find public certificate file at .*")))
+					})
+
+					It("should not raise path exception for the ca", func() {
+						config.Key = keyFile
+						config.Cert = certFile
+						config.CA = ""
+						err := config.Validate()
+						Ω(err).ShouldNot(HaveOccurred())
+					})
+
+				})
+
+				Context("client verification defaults", func() {
+
+					BeforeEach(func() {
+						config.Insecure = false
+						config.VerifyClient = true
+					})
+
+					It("should raise missing ca exception", func() {
+						config.Key = keyFile
+						config.Cert = certFile
+						config.CA = ""
+						err := config.Validate()
+						Ω(err).Should(HaveOccurred())
+						Ω(err.(*Error).Code).Should(Equal(ErrImproperlyConfigured))
+						Ω(err).Should(MatchError("Improperly configured: certificate authority required for mutual TLS"))
+					})
+
+					It("should raise a could not find ca error", func() {
+						config.Key = keyFile
+						config.Cert = certFile
+						config.CA = filepath.Join(tmpDir, "not-a-real.ca")
+						err := config.Validate()
+						Ω(err).Should(HaveOccurred())
+						Ω(err.(*Error).Code).Should(Equal(ErrImproperlyConfigured))
+						Ω(err).Should(MatchError(MatchRegexp("Improperly configured: could not find ca file at .*")))
+					})
+
+					It("should return no exceptions when all files are present", func() {
+						config.Key = keyFile
+						config.Cert = certFile
+						config.CA = caFile
+						err := config.Validate()
+						Ω(err).ShouldNot(HaveOccurred())
+					})
+
+				})
+
+				Context("config via environment variables", func() {
+
+					It("should get the configuration from the environment", func() {
+
+						config.Key = ""
+						config.Cert = ""
+						config.CA = ""
+
+						err = config.Validate()
+						Ω(err).Should(HaveOccurred())
+
+						os.Setenv("FLUIDFS_KEY_FILE", keyFile)
+						os.Setenv("FLUIDFS_CERT_FILE", certFile)
+						os.Setenv("FLUIDFS_CA_FILE", caFile)
+
+						err = config.Environ()
+						Ω(err).ShouldNot(HaveOccurred())
+
+						Ω(config.Key).ShouldNot(BeZero())
+						Ω(config.Cert).ShouldNot(BeZero())
+						Ω(config.CA).ShouldNot(BeZero())
+
+						err = config.Validate()
+						Ω(err).ShouldNot(HaveOccurred())
+
+					})
+
+				})
+
 			})
 
 		})

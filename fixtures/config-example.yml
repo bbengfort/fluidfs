@@ -91,3 +91,40 @@ storage:
     # include:  md5, sha1, sha224, sha256, and murmur.
     # Future algorithms to include are: CityHash, FarmHash, and SipHash.
     hashing: sha256
+
+# Configuration for security and certificates
+security:
+
+    # If the insecure flag is set to true, no transport layer security will be
+    # used in replica to replica RPC communications. By default this is false.
+    insecure: false
+
+    # If the verify_client flag is set to true, a certificate authority will
+    # be used to implement mutual tls between replicas so that clients as well
+    # as servers must authenticate with their keys. By default his is true.
+    verify_client: true
+
+    # The location on disk of the replica's private key for TLS encrypted
+    # communication. If null or omitted, and with insecure set to false, the
+    # server will look for the key at ~/.fluidfs/replica.key. If insecure is
+    # set to false and the key is required to exist and be readable. The path
+    # to the key can also be set in the environment as $FLUIDFS_KEY_FILE.
+    # key: null
+
+    # The location on disk of the replica's public certificate for TLS
+    # encrypted communication. If null or omitted, the server will look for
+    # the cert at ~/.fluidfs/replica.cert. If insecure is set to false, the
+    # cert is required to exist and be readable. The path to the key can also
+    # be set in the environment as $FLUIDFS_CERT_FILE.
+    #
+    # NOTE: unless otherwise specified in the hosts file, this cert will be
+    # used by default to connect to other replicas in server-side TLS mode
+    # e.g. if both insecure and verify_client is set to false.
+    # cert: null
+
+    # The location on disk of the fluidfs certificate authority that was used
+    # to sign all public key certificates for each replica. If null or omitted
+    # the server will look for the ca at ~/.fluidfs/ca.crt. If verify_client
+    # is set to true, the ca is required to exist and be readable. The path to
+    # the ca can also be set in the environment as $FLUIDFS_CA_FILE.
+    # ca: null

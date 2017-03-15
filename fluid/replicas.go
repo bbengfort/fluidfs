@@ -3,11 +3,17 @@
 package fluid
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
+	"io/ioutil"
 	"math/rand"
 	"os"
 	"strings"
 	"time"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 )
 
 // Default port numbers for communication and services between replicas.
@@ -98,7 +104,7 @@ func DefaultLocalReplica() (*Replica, error) {
 }
 
 //===========================================================================
-// Replica Methods
+// Replica Initialization
 //===========================================================================
 
 // Init the Replica with default values and return an error if the Replica is
@@ -137,6 +143,208 @@ func (r *Replica) Init() error {
 
 	return nil
 }
+
+//===========================================================================
+// Replica RPC Server Methods
+//===========================================================================
+
+// Serve creates a grpc.Server with the correct security credentials as
+// specified by the configuration. Only the local replica should call serve.
+//
+// NOTE: This method is currently serving as a stub to show  how the replica
+// can be used to create server connections.
+// TODO: Make the replica a server during init and have serve listen with the
+// error channel for registering complaints (create the lis connection in
+// Serve and pass to the various sub serve options).
+// TODO: Registration funcationality for services.
+func (r *Replica) Serve() (*grpc.Server, error) {
+	if config == nil || config.Security == nil {
+		return nil, Errorc("the default security configuration isn't initialized", ErrUninitialized)
+	}
+
+	if config.Security.Insecure {
+		return r.ServeInsecure()
+	}
+
+	if config.Security.VerifyClient {
+		return r.ServeMutualTLS()
+	}
+
+	return r.ServeTLS()
+}
+
+// ServeInsecure creates a grpc.Server with no TLS credentials.
+func (r *Replica) ServeInsecure() (*grpc.Server, error) {
+	srv := grpc.NewServer()
+	return srv, nil
+}
+
+// ServeTLS creates a grpc.Server with server-side TLS credentials.
+func (r *Replica) ServeTLS() (*grpc.Server, error) {
+	// Get the key and certificate from the configuration
+	crt := config.Security.Cert
+	key := config.Security.Key
+
+	// Load the TLS credentials from disk.
+	creds, err := credentials.NewServerTLSFromFile(crt, key)
+	if err != nil {
+		return nil, ParsingError("could not load TLS cert and key from disk", err)
+	}
+
+	// Create the grpc server with the credentials
+	srv := grpc.NewServer(grpc.Creds(creds))
+	return srv, nil
+}
+
+// ServeMutualTLS creates a grpc.Server with client verification and TLS
+// credentials, both verififed with a certificate authority.
+func (r *Replica) ServeMutualTLS() (*grpc.Server, error) {
+	// Get the key, certificate, and CA from the configuration
+	crt := config.Security.Cert
+	key := config.Security.Key
+	caf := config.Security.CA
+
+	// Load the certificaters from disk
+	certificate, err := tls.LoadX509KeyPair(crt, key)
+	if err != nil {
+		return nil, ParsingError("could not load TLS cert and key from disk", err)
+	}
+
+	// Create a certificate pool from the certificate authority
+	certPool := x509.NewCertPool()
+	ca, err := ioutil.ReadFile(caf)
+	if err != nil {
+		return nil, ParsingError("could not read ca certificate", err)
+	}
+
+	// Append the client certificates from the ca
+	if ok := certPool.AppendCertsFromPEM(ca); !ok {
+		return nil, ParsingError("failed to append client certs from CA", nil)
+	}
+
+	// Create the TLS credentials
+	creds := credentials.NewTLS(&tls.Config{
+		ClientAuth:   tls.RequireAndVerifyClientCert,
+		Certificates: []tls.Certificate{certificate},
+		ClientCAs:    certPool,
+	})
+
+	// Create the grpc server with the credentials
+	srv := grpc.NewServer(grpc.Creds(creds))
+	return srv, nil
+}
+
+//===========================================================================
+// Replica RPC Dial Methods
+//===========================================================================
+
+// Dial creates a grpc connection with the correct security credentials as
+// specified by the configuration. All remote replicas will be dialed.
+//
+// NOTE: This method is currently serving as a stub to show  how the replica
+// can be used to create client connections.
+// TODO: Make the replica client during init and have dial connect at runtime.
+// TODO: Client construction funcationality for services.
+func (r *Replica) Dial() (*grpc.ClientConn, error) {
+	if config == nil || config.Security == nil {
+		return nil, Errorc("the default security configuration isn't initialized", ErrUninitialized)
+	}
+
+	if config.Security.Insecure {
+		return r.DialInsecure()
+	}
+
+	if config.Security.VerifyClient {
+		return r.DialMutualTLS()
+	}
+
+	return r.DialTLS()
+
+}
+
+// DialInsecure creates a client connection with no security credentials.
+func (r *Replica) DialInsecure() (*grpc.ClientConn, error) {
+	conn, err := grpc.Dial(r.GetAddr(), grpc.WithInsecure())
+	if err != nil {
+		return nil, NetworkError("could not connect to %s", err, r.GetAddr())
+	}
+
+	return conn, nil
+}
+
+// DialTLS creates a client connection with the specified server credentials
+// defaulting to the credentials in the global config if no specific one is
+// provided.
+func (r *Replica) DialTLS() (*grpc.ClientConn, error) {
+
+	// Find the right certificate
+	var cert string
+	if r.TLSCert != "" {
+		cert = r.TLSCert
+	} else {
+		cert = config.Security.Cert
+	}
+
+	// Create the client TLS credentials
+	// TODO: do we need to specify a server name override?
+	creds, err := credentials.NewClientTLSFromFile(cert, "")
+	if err != nil {
+		return nil, ParsingError("could not load tls certifcate for %s", err, r.Name)
+	}
+
+	conn, err := grpc.Dial(r.GetAddr(), grpc.WithTransportCredentials(creds))
+	if err != nil {
+		return nil, NetworkError("could not connect to %s", err, r.GetAddr())
+	}
+
+	return conn, nil
+}
+
+// DialMutualTLS creates a client connection with client verification for
+// mutual TLS using a certificate authority.
+func (r *Replica) DialMutualTLS() (*grpc.ClientConn, error) {
+	// Get the key, certificate, and CA from the configuration
+	crt := config.Security.Cert
+	key := config.Security.Key
+	caf := config.Security.CA
+
+	// Load the certificaters from disk
+	certificate, err := tls.LoadX509KeyPair(crt, key)
+	if err != nil {
+		return nil, ParsingError("could not load TLS cert and key from disk", err)
+	}
+
+	// Create a certificate pool from the certificate authority
+	certPool := x509.NewCertPool()
+	ca, err := ioutil.ReadFile(caf)
+	if err != nil {
+		return nil, ParsingError("could not read ca certificate", err)
+	}
+
+	// Append the client certificates from the ca
+	if ok := certPool.AppendCertsFromPEM(ca); !ok {
+		return nil, ParsingError("failed to append client certs from CA", nil)
+	}
+
+	// Create TLS credentials
+	creds := credentials.NewTLS(&tls.Config{
+		ServerName:   r.Addr, // NOTE: this is required!
+		Certificates: []tls.Certificate{certificate},
+		RootCAs:      certPool,
+	})
+
+	// Create a connection with the TLS credentials
+	conn, err := grpc.Dial(r.GetAddr(), grpc.WithTransportCredentials(creds))
+	if err != nil {
+		return nil, NetworkError("could not connect to %s", err, r.GetAddr())
+	}
+
+	return conn, nil
+}
+
+//===========================================================================
+// Replica Update Methods
+//===========================================================================
 
 // Update a replica by key/value pair - used to ensure that all modifications
 // to the Replica are tracked via the updated timestamp.

@@ -47,6 +47,7 @@ type Config struct {
 	Logging          *LoggingConfig  `yaml:"logging"`                      // Configuration for logging
 	Database         *DatabaseConfig `yaml:"database"`                     // Database configuration
 	Storage          *StorageConfig  `yaml:"storage"`                      // Storage/Chunking configuration
+	Security         *SecurityConfig `yaml:"security"`                     // Security/TLS configuration
 	Loaded           []string        `yaml:"-"`                            // Reference to the loaded configuration paths
 
 }
@@ -188,6 +189,10 @@ func (conf *Config) Defaults() error {
 	conf.Storage = new(StorageConfig)
 	conf.Storage.Defaults()
 
+	// Create the security configuration and call its defaults.
+	conf.Security = new(SecurityConfig)
+	conf.Security.Defaults()
+
 	return nil
 }
 
@@ -234,6 +239,11 @@ func (conf *Config) Validate() error {
 		return err
 	}
 
+	// Validate the SecurityConfig
+	if err := conf.Security.Validate(); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -254,6 +264,11 @@ func (conf *Config) Environ() error {
 		return err
 	}
 
+	// Make sure the security configuration can get environment variables.
+	if err := conf.Security.Environ(); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -263,6 +278,7 @@ func (conf *Config) String() string {
 	output += "\n" + conf.Database.String()
 	output += "\n" + conf.Storage.String()
 	output += "\n" + conf.Logging.String()
+	output += "\n" + conf.Security.String()
 	return output
 }
 
@@ -488,4 +504,109 @@ func (conf *StorageConfig) Environ() error {
 // String returns a pretty representation of the storage configuration.
 func (conf *StorageConfig) String() string {
 	return fmt.Sprintf("%s length %d byte blobs stored at %s", conf.Chunking, conf.BlockSize, conf.Path)
+}
+
+//===========================================================================
+// Security Configuration
+//===========================================================================
+
+// SecurityConfig is primarily utilized to define the network security
+// protocol (e.g. TLS/MutualTLS) for communication between replicas. It can
+// also be used to specify keys for local blob encryption and key management.
+type SecurityConfig struct {
+	Insecure     bool   `yaml:"insecure,omitempty"`      // Whether or not to use transport security
+	VerifyClient bool   `yaml:"verify_client,omitempty"` // Whether or not to use mutual TLS
+	Key          string `yaml:"key,omitempty"`           // Location on disk of the private key, also $FLUIDFS_KEY_FILE
+	Cert         string `yaml:"cert,omitempty"`          // Location on disk of the TLS certificate, also $FLUIDFS_CERT_FILE
+	CA           string `yaml:"ca,omitempty"`            // Location on disk of the TLS certificate authority, also $FLUIDFS_CA_FILE
+}
+
+// Defaults sets the reasonable defaults on the SecurityConfig object.
+func (conf *SecurityConfig) Defaults() error {
+
+	// The default security level is to use TLS with client verification
+	conf.Insecure = false
+	conf.VerifyClient = true
+
+	// The default path to key files is in the hidden configuration directory.
+	usr, err := user.Current()
+	if err == nil {
+		conf.Key = filepath.Join(usr.HomeDir, HiddenConfigDirectory, "replica.key")
+		conf.Cert = filepath.Join(usr.HomeDir, HiddenConfigDirectory, "replica.crt")
+		conf.CA = filepath.Join(usr.HomeDir, HiddenConfigDirectory, "ca.crt")
+	}
+
+	return nil
+}
+
+// Validate ensures that required security settings are correct
+func (conf *SecurityConfig) Validate() error {
+
+	// If the Insecure flag is set, no further validation required.
+	if conf.Insecure {
+		return nil
+	}
+
+	// Require paths for key and cert
+	if conf.Key == "" || conf.Cert == "" {
+		return ImproperlyConfigured("private key and certificate required for secure operation")
+	}
+
+	// Verify that the private key file exists on disk.
+	if _, err := os.Stat(conf.Key); os.IsNotExist(err) {
+		return ImproperlyConfigured("could not find private key file at %s", conf.Key)
+	}
+
+	// Verify that the public certificate file exists on disk.
+	if _, err := os.Stat(conf.Cert); os.IsNotExist(err) {
+		return ImproperlyConfigured("could not find public certificate file at %s", conf.Cert)
+	}
+
+	// If the VerifyClient flag is set, validate that the ca file exists on disk.
+	if conf.VerifyClient {
+		// Require path for certificate authority
+		if conf.CA == "" {
+			return ImproperlyConfigured("certificate authority required for mutual TLS")
+		}
+
+		if _, err := os.Stat(conf.CA); os.IsNotExist(err) {
+			return ImproperlyConfigured("could not find ca file at %s", conf.CA)
+		}
+	}
+
+	return nil
+}
+
+// Environ sets the security conifguration from the environment, specifically
+// looking for $FLUIDFS_KEY_FILE, $FLUIDFS_CERT_FILE, and $FLUIDFS_CA_FILE.
+func (conf *SecurityConfig) Environ() error {
+	// Look up the private key environment variable.
+	if val, ok := os.LookupEnv("FLUIDFS_KEY_FILE"); ok {
+		conf.Key = val
+	}
+
+	// Look up the public certificate environment variable.
+	if val, ok := os.LookupEnv("FLUIDFS_CERT_FILE"); ok {
+		conf.Cert = val
+	}
+
+	// Look up the certificate authority environment variable.
+	if val, ok := os.LookupEnv("FLUIDFS_CA_FILE"); ok {
+		conf.CA = val
+	}
+
+	return nil
+}
+
+// String returns a pretty representation of the security configuration.
+func (conf *SecurityConfig) String() string {
+	if conf.Insecure {
+		return "security: insecure communications"
+	}
+
+	if conf.VerifyClient {
+		return "security: mutual TLS encrypted communication"
+	}
+
+	return "security: server-side TLS encrypted communication"
 }
