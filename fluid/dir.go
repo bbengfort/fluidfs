@@ -4,7 +4,6 @@ package fluid
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -74,28 +73,30 @@ func (d *Dir) Store() error {
 	// Marshall the directory into bytes data.
 	data, err := json.Marshal(d)
 	if err != nil {
-		return fmt.Errorf("could not marshal directory: %s", err)
+		return Errorw("could not marshal directory", err)
 	}
 
 	// Put the data into prefixes namespace
 	if err := db.Put([]byte(ntype.Key), data, kvdb.PrefixesBucket); err != nil {
-		return fmt.Errorf("could not store prefix: %s", err)
+		return DatabaseError("could not store prefix", err)
 	}
 
 	// Marshal the node type
 	data, err = json.Marshal(ntype)
 	if err != nil {
-		return fmt.Errorf("could not marshal node type: %s", err)
+		return Errorw("could not marshal node type", err)
 	}
 
 	// Put the node type into the global namespace
 	if err := db.Put([]byte(d.FluidPath()), data, kvdb.NamesBucket); err != nil {
-		return fmt.Errorf("could not store name %s: %s", d.FluidPath(), err)
+		return DatabaseError("could not store name %s", err, d.FluidPath())
 	}
 
 	// Set metadirty to false
 	d.metadirty = false
-	return nil
+
+	// Invalidate the cache
+	return d.InvalidateData()
 }
 
 // Fetch the directory from persistant storage. The directory is populated by
@@ -104,12 +105,12 @@ func (d *Dir) Fetch(key string) error {
 	// Fetch the key from the prefixes bucket
 	val, err := db.Get([]byte(key), kvdb.PrefixesBucket)
 	if err != nil {
-		return err
+		return DatabaseError("could not get name '%s'", err, key)
 	}
 
 	// Unmarshall the directory metadata into the struct
 	if err := json.Unmarshal(val, &d); err != nil {
-		return err
+		return Errorw("could not unmarshal directory", err)
 	}
 
 	// Update the directory with current information
@@ -131,8 +132,8 @@ func (d *Dir) Expand() error {
 		if _, ok := d.entities[name]; !ok {
 			if err := d.ExpandChild(name, fpath); err != nil {
 				// NOTE: specific error is logged in Expandchild
-				msg := "could not fully expand expand %s"
-				logger.Error(msg, d)
+				err = WrapError("could not fully expand expand %s", ErrFluidExit, "", err, d)
+				err.(*Error).Log()
 				return err
 			}
 		}

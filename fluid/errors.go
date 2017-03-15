@@ -6,11 +6,19 @@ import "fmt"
 const (
 	_                       = iota // Ignore Zero error codes
 	ErrFluidExit                   // FluidFS must exit (default error)
+	ErrFileSystem                  // Error with FUSE or the file system
 	ErrNotImplemented              // Feature is not currently implemented
 	ErrImproperlyConfigured        // Configuration error or missing value
 	ErrNetworkUnavailable          // Cannot reach network interface
 	ErrUninitialized               // A required component is not initialized correctly
+	ErrUnsupported                 // The operating system or component is not supported
 	ErrChunking                    // Something went wrong during chunking
+	ErrAPIAccess                   // Soemthing went wrong accessing the API
+	ErrParsing                     // Something went wrong parsing a file
+	ErrInvalidReplica              // A replica is not configured correctly
+	ErrDatabase                    // Error interacting with the database
+	ErrBlobStorage                 // Error with blob storage
+	ErrReplication                 // Error with blob or version replication
 )
 
 //===========================================================================
@@ -43,6 +51,16 @@ func Errors(message string) error {
 	return Errorc(message, ErrFluidExit)
 }
 
+// Errorsf creates a simple error with string formatting
+func Errorsf(message string, args ...interface{}) error {
+	return Errors(fmt.Sprintf(message, args...))
+}
+
+// Errorw creates a simple wrapped error with default code and no prefix.
+func Errorw(message string, err error) error {
+	return WrapError(message, ErrFluidExit, "", err)
+}
+
 // Errorf creates an error with the given code, prefix, and message but also
 // performs some string formatting on behalf of the user (similar to the
 // fmt.Errorf function, but with codes and prefixes).
@@ -72,6 +90,21 @@ func ChunkingError(message string, args ...interface{}) error {
 	return Errorf(message, ErrChunking, "", args...)
 }
 
+// APIAccessError creates a new ErrAPIAccess error.
+func APIAccessError(message string, err error, args ...interface{}) error {
+	return WrapError(message, ErrAPIAccess, "", err, args...)
+}
+
+// ParsingError creates a new ErrParsing error.
+func ParsingError(message string, err error, args ...interface{}) error {
+	return WrapError(message, ErrParsing, "", err, args...)
+}
+
+// DatabaseError creates a new ErrDatabase error.
+func DatabaseError(message string, err error, args ...interface{}) error {
+	return WrapError(message, ErrDatabase, "", err, args...)
+}
+
 //===========================================================================
 // Error Type and Methods
 //===========================================================================
@@ -95,4 +128,9 @@ func (err *Error) Error() string {
 		return fmt.Sprintf("%s%s: %s", err.Prefix, err.Message, err.err.Error())
 	}
 	return fmt.Sprintf("%s%s", err.Prefix, err.Message)
+}
+
+// Log the error using the default logger.
+func (err *Error) Log() {
+	logger.Error(err.Error())
 }

@@ -93,26 +93,26 @@ func Init(conf string) error {
 	// Initialize the FSTable from the fstab path
 	fstab = new(FuseFSTable)
 	if err = fstab.Load(config.FStab); err != nil {
-		return fmt.Errorf("could not load fstab: %s", err)
+		return Errorw("could not load fstab", err)
 	}
 
 	// Initialize the Hosts from the hosts path
 	hosts = new(Hosts)
 	if err = hosts.Load(config.Hosts); err != nil {
-		return fmt.Errorf("could not load hosts: %s", err)
+		return Errorw("could not load hosts", err)
 	}
 
 	// Initialize the local replica
 	local, err = hosts.Local()
 	if err != nil {
-		return fmt.Errorf("could not initialize local replica: %s", err)
+		return Errorw("could not initialize local replica", err)
 	}
 	logger.Info("local replica: %s with precedence %d", local, local.Precedence)
 
 	// Initialize the C2S API
 	web = new(C2SAPI)
 	if err = web.Init(); err != nil {
-		return fmt.Errorf("could not initialize web api: %s", err)
+		return Errorw("could not initialize web api", err)
 	}
 
 	return nil
@@ -132,7 +132,7 @@ func Run() error {
 	// Create a PID file
 	pid = new(PID)
 	if err = pid.Save(); err != nil {
-		return fmt.Errorf("could not write PID file: %s", err.Error())
+		return Errorw("could not write PID file", err)
 	}
 
 	// Log the creation of the PID file
@@ -141,7 +141,7 @@ func Run() error {
 	// Open a connection to the database
 	db, err = kvdb.InitDatabase(config.Database)
 	if err != nil {
-		return fmt.Errorf("could not connect to database: %s", err.Error())
+		return Errorw("could not connect to database", err)
 	}
 
 	// Log the connection to the database
@@ -154,7 +154,7 @@ func Run() error {
 
 	// Run the FUSE File Systems
 	if err = fstab.Run(echan); err != nil {
-		return fmt.Errorf("could not run the FUSE file system: %s", err.Error())
+		return Errorw("could not run the FUSE file system", err)
 	}
 
 	// Run the C2S API and web interface

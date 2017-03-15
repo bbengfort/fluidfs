@@ -2,7 +2,10 @@
 
 package fluid
 
-import "strings"
+import (
+	"os"
+	"strings"
+)
 
 // Formatters for representing the date and time as a string.
 const (
@@ -121,4 +124,29 @@ func Blocks(value uint64) uint64 {
 	}
 
 	return blocks
+}
+
+//===========================================================================
+// File Path Helpers
+//===========================================================================
+
+// IsHidden returns true if the file name starts with "." or "~" or if a
+// directory name starts with "." (skip "~" in case it's the home directory).
+// This method does not work on Windows currently.
+func IsHidden(info os.FileInfo) bool {
+	name := info.Name()
+
+	if info.IsDir() {
+		if strings.HasPrefix(name, ".") {
+			return true
+		}
+
+		return false
+	}
+
+	if strings.HasPrefix(name, ".") || strings.HasPrefix(name, "~") {
+		return true
+	}
+
+	return false
 }

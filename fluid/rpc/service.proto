@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+import "blobs.proto";
+
+package rpc;
+
+// InterReplica defines the service that allows inter-replica communication.
+service InterReplica {
+
+    rpc PushHandler(PushRequest) returns (PushReply) {}
+
+}

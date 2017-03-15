@@ -22,6 +22,14 @@ var _ = Describe("Errors", func() {
 		Ω(err.Error()).Should(Equal("this is test 8 with aplomb"))
 	})
 
+	It("should correctly identify wrapped errors", func() {
+		erra := Errors("something bad happened").(*Error)
+		errb := WrapError("trouble with %s", 0, "", erra, "our code").(*Error)
+
+		Ω(erra.Wraps()).Should(BeFalse())
+		Ω(errb.Wraps()).Should(BeTrue())
+	})
+
 	It("should wrap another error with formatting", func() {
 		erra := errors.New("something bad happened")
 		errb := WrapError("trouble with %s", 0, "", erra, "our code")

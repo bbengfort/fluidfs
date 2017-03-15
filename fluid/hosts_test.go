@@ -73,13 +73,13 @@ var _ = Describe("hosts", func() {
 				Updated: time.Now(),
 				Replicas: map[string]*Replica{
 					"apollo": &Replica{
-						1, "apollo", "192.168.1.12", 4157, false, 23, 2, make([]string, 0), time.Now(), time.Now(), time.Time{}, 0, 0,
+						1, "apollo", "192.168.1.12", 4157, false, 23, 2, make([]string, 0), time.Now(), time.Now(), time.Time{}, 0, 0, "",
 					},
 					"cyrus": &Replica{
-						2, "cyrus", "192.168.1.13", 4157, false, 23, 2, make([]string, 0), time.Now(), time.Now(), time.Time{}, 0, 0,
+						2, "cyrus", "192.168.1.13", 4157, false, 23, 2, make([]string, 0), time.Now(), time.Now(), time.Time{}, 0, 0, "",
 					},
 					"sol": &Replica{
-						3, "sol", "192.168.1.14", 4157, false, 23, 2, make([]string, 0), time.Now(), time.Now(), time.Time{}, 0, 0,
+						3, "sol", "192.168.1.14", 4157, false, 23, 2, make([]string, 0), time.Now(), time.Now(), time.Time{}, 0, 0, "",
 					},
 				},
 			}
@@ -102,10 +102,6 @@ var _ = Describe("hosts", func() {
 			// New hosts should be indentical to the old hosts
 			Ω(hosts.Replicas).Should(Equal(hosts2.Replicas))
 		})
-
-	})
-
-	Describe("Replica", func() {
 
 	})
 

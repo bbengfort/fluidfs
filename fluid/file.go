@@ -90,7 +90,8 @@ func (f *File) Store() error {
 		return err
 	}
 
-	return nil
+	// Invalidate the cache
+	return f.InvalidateData()
 }
 
 // StoreMeta is a helper function to specifically store the metadata of the

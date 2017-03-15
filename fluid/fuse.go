@@ -82,7 +82,7 @@ func (fs *FileSystem) Init(mp *MountPoint) error {
 }
 
 // Run connects to FUSE, mounts the mount point and Serves the FUSE FS.
-func (fs *FileSystem) Run(echan chan error) {
+func (fs *FileSystem) Run(echan chan<- error) {
 	var err error
 
 	// Unmount the FS in case it was mounted with errors

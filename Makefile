@@ -58,7 +58,7 @@ publish:
 	@echo "Deploying docs to gh-pages branch"
 	@mkdocs gh-deploy --clean --quiet
 
-# Compile protocol buffers 
+# Compile protocol buffers
 protobuf:
 	@echo "Compiling protocol buffers"
-	@protoc -I fluid/comms/ fluid/comms/*.proto --go_out=plugins=grpc:fluid/comms
+	@protoc -I fluid/rpc/ fluid/rpc/*.proto --go_out=plugins=grpc:fluid/rpc

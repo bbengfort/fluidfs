@@ -9,7 +9,7 @@ import (
 
 // Flusher is a goroutine that runs in the background and will flush metadata
 // to disk if its dirty, thus preventing interruptions to the file system.
-func Flusher(delay int64, echan chan error) {
+func Flusher(delay int64, echan chan<- error) {
 
 	// Create the ticker with the delay in millisecond
 	ticker := time.NewTicker(time.Millisecond * time.Duration(delay))

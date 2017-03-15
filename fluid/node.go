@@ -197,6 +197,34 @@ func (n *Node) String() string {
 	return n.Path()
 }
 
+// Private function to correctly invalidate the kernel cache of the node.
+// BUG: Getting an invalid argument error, suspect it's the node id.
+func (n *Node) invalidate(off, size int64) error {
+	// id := fuse.NodeID(n.ID)
+	// if err := n.fs.Conn.InvalidateNode(id, off, size); err != fuse.ErrNotCached {
+	// 	return WrapError("could not invalidate node %d", ErrFileSystem, "", err, n.ID)
+	// }
+	return nil
+}
+
+// InvalidateData invalidates the kernel cache of the attributes and data of
+// the node. This function catches fuse.ErrNotCached if the kernel is not
+// already caching the node, but returns all other errors.
+//
+// Implementation details from fuse.fs.Server.InvalidateNodeData
+func (n *Node) InvalidateData() error {
+	return n.invalidate(0, -1)
+}
+
+// InvalidateAttr invalidates the kernel cache of the attributes of the node.
+// This function catches fuse.ErrNotCached if the kernel is not  already
+/// caching the node, but returns all other errors.
+//
+// Implementation details from fuse.fs.Server.InvalidateNodeAttr
+func (n *Node) InvalidateAttr() error {
+	return n.invalidate(0, 0)
+}
+
 //===========================================================================
 // Node Interface
 //===========================================================================

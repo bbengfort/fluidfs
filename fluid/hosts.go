@@ -3,7 +3,6 @@
 package fluid
 
 import (
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
@@ -131,7 +130,7 @@ func (h *Hosts) Save(path string) error {
 func (h *Hosts) Local() (*Replica, error) {
 	// If we don't have a configuration we can't do anything.
 	if config == nil {
-		return nil, errors.New("no local configuration has been loaded")
+		return nil, Errorc("no local configuration has been loaded", ErrUninitialized)
 	}
 
 	// If we've already loaded the local from disk, return it.
