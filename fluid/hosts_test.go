@@ -100,7 +100,10 @@ var _ = Describe("hosts", func() {
 			Ω(err).Should(BeNil(), fmt.Sprintf("%s", err))
 
 			// New hosts should be indentical to the old hosts
-			Ω(hosts.Replicas).Should(Equal(hosts2.Replicas))
+			for name, replica := range hosts.Replicas {
+				Ω(hosts2.Replicas).Should(HaveKeyWithValue(name, replica))
+			}
+
 		})
 
 	})
